@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use crate::*;
 
 use once_cell::sync::Lazy;
 use solana_client::rpc_client::RpcClient;
@@ -23,7 +24,7 @@ pub static SIGNER_PUBKEY: Lazy<Pubkey> = Lazy::new(||{
 pub static RPC_ENDPOINT: Lazy<Arc<RpcClient>> = Lazy::new(||{
   Arc::new(RpcClient::new_with_commitment(CONFIG.connection_config.rpc_endpoint.clone(), CommitmentConfig { commitment: solana_commitment_config::CommitmentLevel::Processed }))
 });
-pub static GRPC_ENDPOINT: Lazy<String> = Lazy::new(||CONFIG.connection_config.rpc_endpoint.clone());
+pub static GRPC_ENDPOINT: Lazy<String> = Lazy::new(||CONFIG.connection_config.grpc_endpoint.clone());
 pub static GRPC_TOKEN: Lazy<String> = Lazy::new(||CONFIG.connection_config.grpc_token.clone());
 
 
@@ -37,5 +38,15 @@ pub static ZERO_SLOT_API_KEY: Lazy<String> = Lazy::new(||CONFIG.relayer.zero_slo
 //Buy setting
 pub static BUY_AMOUNT_SOL: Lazy<f64> = Lazy::new(||CONFIG.buy_setting.buy_amount_sol);
 
+//Slippage
+pub static SLIPPAGE: Lazy<u32> = Lazy::new(||CONFIG.slippage);
 
+pub fn show_bot_settings(){
+  log!("Public key: {:?}", SIGNER_PUBKEY);
+  log!("Confirm service: {:?}", CONFIRM_SERVICE);
+  log!("Buy settings: {:?}", CONFIG.buy_setting);
+  log!("Slippage: {:?}%", SLIPPAGE);
+  log!("Grpc endpoint: {:?}", GRPC_ENDPOINT);
+  log!("Grpc token: {:?}", GRPC_TOKEN);
+}
 
