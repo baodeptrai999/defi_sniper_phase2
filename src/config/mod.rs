@@ -10,11 +10,12 @@ pub use bot_config::*;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-  pub wallet_credential: WalletCredentialConfig,
+  pub wallet_config: WalletCredentialConfig,
   pub connection_config: ConnectionConfig,
-  pub relayer: RelayerConfig,
+  pub relayer_config: RelayerConfig,
   pub buy_setting: BuySetting,
-  pub slippage: u32,
+  pub slippage_config: SlippageConfig,
+  pub fee_config: FeeConfig
 }
 
 pub static CONFIG: Lazy<Config> = Lazy::new(||{
