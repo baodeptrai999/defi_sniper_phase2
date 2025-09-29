@@ -34,11 +34,17 @@ pub fn make_half_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSch
             );
 
             (ix, tag)
-        } else if !token_data.token_is_purchased && token_data.last_event.last_tracked_event == TokenEvent::BuyTokenEvent && half_copy_buy_filter_check(token_data.clone()) {
+        } else if !token_data.token_buy_is_tracked
+            && token_data.last_event.last_tracked_event == TokenEvent::BuyTokenEvent
+            && half_copy_buy_filter_check(token_data.clone())
+        {
             let buy_tx_remaining_counter = get_buy_tx_remain_counter();
 
             if !*DEV_MODE || buy_tx_remaining_counter != 0 {
                 decrese_buy_tx_remain_counter();
+
+                token_data.token_buy_is_tracked = true;
+                let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
 
                 let build_tx_start = Instant::now();
                 let mut ix: Vec<Instruction> = Vec::new();
