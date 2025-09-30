@@ -7,6 +7,7 @@ use std::time::Instant;
 pub fn make_sniper_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSchema>) {
     for trade_token_data in trade_token_data_map.iter() {
         let mut token_data = trade_token_data.value().clone();
+        // println!("{} {}", "Token buy is tracked".yellow(), token_data.token_buy_is_tracked);
 
         let instructions: (Vec<Instruction>, String) = if token_data.token_is_purchased
             && token_data.bundle_tx_counter >= *BUNDLE_TX_LIMIT
