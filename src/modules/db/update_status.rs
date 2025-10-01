@@ -26,7 +26,11 @@ pub fn update_status_from_buy_event(
 
     info!(
         "[{}]\t*Mint: {}\t*MC: {:.2} SOL\t{}",
-        "Detect holding",
+        if token_data.token_is_purchased {
+            "Detect-Holding"
+        } else {
+            "Detect-Waiting"
+        },
         token_data.token_mint,
         token_data.token_marketcap,
         match token_data.token_volume {
@@ -116,7 +120,11 @@ pub fn update_status_from_sell_event(
 
     info!(
         "[{}]\t*Mint: {}\t*MC: {:.2} SOL\t{}",
-        "Detect holding",
+        if token_data.token_is_purchased {
+            "Detect-Holding"
+        } else {
+            "Detect-Waiting"
+        },
         token_data.token_mint,
         token_data.token_marketcap,
         match token_data.token_volume {
