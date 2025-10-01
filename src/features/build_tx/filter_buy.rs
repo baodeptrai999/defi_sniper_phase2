@@ -5,7 +5,6 @@ pub fn sniper_buy_filter_check(token_data: TokenDatabaseSchema) -> bool {
     let mut blacklist_valid = true;
     let mut market_cap_valid = true;
     let mut volume_valid = true;
-    let mut max_token_holder_valid = true;
 
     if *BLACK_LIST_FILTER {
         if WALLET_BLACKLIST.contains(&token_data.token_creator.to_string()) {
@@ -43,6 +42,39 @@ pub fn sniper_buy_filter_check(token_data: TokenDatabaseSchema) -> bool {
         }
     }
 
+    blacklist_valid && market_cap_valid && volume_valid
+}
+
+pub fn half_copy_buy_filter_check(token_data: TokenDatabaseSchema) -> bool {
+    let mut blacklist_valid = true;
+
+    if *BLACK_LIST_FILTER {
+        if WALLET_BLACKLIST.contains(&token_data.token_creator.to_string()) {
+            warning!(
+                "Token creator is blacklisted wallet: {}",
+                &token_data
+                    .pump_fun_swap_accounts
+                    .creator_vault
+                    .to_string()
+                    .red()
+            );
+            blacklist_valid = false;
+        }
+
+        if TOKEN_BLACKLIST.contains(&token_data.token_mint.to_string()) {
+            warning!(
+                "Token is blacklisted token: {}",
+                &token_data.token_mint.to_string().red()
+            );
+            blacklist_valid = false
+        }
+    }
+
+    blacklist_valid
+}
+
+pub fn max_token_holder_check(token_data: TokenDatabaseSchema) -> bool {
+    let mut max_token_holder_valid = true;
     if *MAX_TOKEN_HOLDER_FILTER {
         let data = match RPC_CLIENT.get_token_largest_accounts(&token_data.token_mint) {
             Ok(data) => data,
@@ -80,36 +112,7 @@ pub fn sniper_buy_filter_check(token_data: TokenDatabaseSchema) -> bool {
                     }
                 }
             }
-        };
-    }
-
-    blacklist_valid && market_cap_valid && volume_valid && max_token_holder_valid
-}
-
-pub fn half_copy_buy_filter_check(token_data: TokenDatabaseSchema) -> bool {
-    let mut blacklist_valid = true;
-
-    if *BLACK_LIST_FILTER {
-        if WALLET_BLACKLIST.contains(&token_data.token_creator.to_string()) {
-            warning!(
-                "Token creator is blacklisted wallet: {}",
-                &token_data
-                    .pump_fun_swap_accounts
-                    .creator_vault
-                    .to_string()
-                    .red()
-            );
-            blacklist_valid = false;
-        }
-
-        if TOKEN_BLACKLIST.contains(&token_data.token_mint.to_string()) {
-            warning!(
-                "Token is blacklisted token: {}",
-                &token_data.token_mint.to_string().red()
-            );
-            blacklist_valid = false
         }
     }
-
-    blacklist_valid
+    max_token_holder_valid
 }

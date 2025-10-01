@@ -35,13 +35,15 @@ pub fn make_sniper_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSchema
             );
 
             (ix, tag)
-        } else if !token_data.token_buy_is_tracked
-            && sniper_buy_filter_check(token_data.clone())
-        {
+        } else if !token_data.token_buy_is_tracked && sniper_buy_filter_check(token_data.clone()) {
             let buy_tx_remaining_counter = get_buy_tx_remain_counter();
 
             if !*DEV_MODE || buy_tx_remaining_counter != 0 {
                 decrese_buy_tx_remain_counter();
+
+                if !max_token_holder_check(token_data.clone()) {
+                    continue;
+                }
 
                 token_data.token_buy_is_tracked = true;
                 let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
