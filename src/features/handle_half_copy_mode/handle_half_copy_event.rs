@@ -67,18 +67,27 @@ pub async fn handle_half_copy_events(
 
     for (i, sell_event) in sell_events.iter().enumerate() {
         if let Some(token_data) = TOKEN_DB.get(sell_event.mint).unwrap() {
-            if TARGET_WALLETS.contains(&sell_event.user.to_string()) && !half_copy_buy_filter_check(token_data.clone()) {
-                let target_token_account_balance = RPC_CLIENT
-                    .get_token_account_balance(&sell_ixs_accounts[i].associated_user)
-                    .unwrap();
-                if let Some(amount) = target_token_account_balance.ui_amount {
-                    if amount <= 0.0 {
+            if TARGET_WALLETS.contains(&sell_event.user.to_string())
+                && !half_copy_buy_filter_check(token_data.clone())
+            {
+                let target_token_account_balance =
+                    RPC_CLIENT.get_token_account_balance(&sell_ixs_accounts[i].associated_user);
+                match target_token_account_balance {
+                    Ok(balance) => {
+                        if let Some(amount) = balance.ui_amount {
+                            if amount <= 0.0 {
+                                let _ = TOKEN_DB.delete(sell_event.mint);
+                                continue;
+                            }
+                        }
+                    }
+                    Err(_) => {
                         let _ = TOKEN_DB.delete(sell_event.mint);
                         continue;
                     }
-                };
+                }
             }
-            
+
             if let Some(updated_token_data) = update_status_from_sell_event(
                 token_data.clone(),
                 sell_event.clone(),
