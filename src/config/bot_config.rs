@@ -1,5 +1,6 @@
 use crate::*;
 use std::sync::Arc;
+use lazy_static::lazy_static;
 
 use once_cell::sync::Lazy;
 use solana_client::rpc_client::RpcClient;
@@ -9,7 +10,7 @@ use solana_sdk::{
     pubkey::Pubkey,
     signer::{Signer, keypair::Keypair},
 };
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, Ordering, AtomicBool};
 
 use colored::*;
 use console::Emoji;
@@ -71,7 +72,7 @@ pub static ZERO_SLOT_API_KEY: Lazy<String> =
 pub static BUY_AMOUNT_SOL: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.buy_amount_sol);
 
 //Slippage
-pub static SLIPPAGE: Lazy<u32> = Lazy::new(|| CONFIG.slippage_config.slippage);
+pub static SLIPPAGE: Lazy<f64> = Lazy::new(|| 1.0 + CONFIG.slippage_config.slippage_percent as f64 / 100.0);
 pub static HALF_COPY_PCNT_MODE: Lazy<bool> = Lazy::new(|| CONFIG.buy_setting.half_copy_pcnt_mode);
 pub static BUY_AMOUNT_PERCENT: Lazy<u32> = Lazy::new(|| CONFIG.buy_setting.buy_amount_percent);
 
@@ -117,6 +118,12 @@ pub static MAX_TOKEN_HOLDER_LIMIT: Lazy<u64> =
 pub static STOP_NO_ACTIVITY_TOKEN_MONITORING: Lazy<bool> =
     Lazy::new(|| CONFIG.monitor_setting.stop_no_activity_token_monitoring);
 pub static NO_ACTIVITY_TIME: Lazy<i64> = Lazy::new(|| CONFIG.monitor_setting.no_activity_time);
+
+// timer (Auto turn off)
+
+lazy_static!{
+    pub static ref AUTO_TURNOFF: AtomicBool = AtomicBool::new(false);
+}
 
 pub fn show_bot_settings() {
     log!("Public key: {:?}", *SIGNER_PUBKEY);

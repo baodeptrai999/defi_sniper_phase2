@@ -70,7 +70,7 @@ pub struct SellSetting {
 
 #[derive(Debug, Deserialize)]
 pub struct SlippageConfig {
-    pub slippage: u32,
+    pub slippage_percent: u32,
 }
 
 #[derive(Debug, Deserialize)]

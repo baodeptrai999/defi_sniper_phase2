@@ -67,7 +67,8 @@ pub async fn handle_half_copy_events(
 
     for (i, sell_event) in sell_events.iter().enumerate() {
         if let Some(token_data) = TOKEN_DB.get(sell_event.mint).unwrap() {
-            if TARGET_WALLETS.contains(&sell_event.user.to_string())
+            if !token_data.token_is_purchased
+                && TARGET_WALLETS.contains(&sell_event.user.to_string())
                 && !half_copy_buy_filter_check(token_data.clone())
             {
                 let target_token_account_balance =
@@ -78,7 +79,8 @@ pub async fn handle_half_copy_events(
                             if amount <= 0.0 {
                                 alert!(
                                     "[Sell]\t*Stop monitoring\t*Mint: {}\t*Target {} sold token before our filter",
-                                    sell_event.mint, sell_event.user
+                                    sell_event.mint,
+                                    sell_event.user
                                 );
                                 let _ = TOKEN_DB.delete(sell_event.mint);
                                 continue;
@@ -88,7 +90,8 @@ pub async fn handle_half_copy_events(
                     Err(_) => {
                         alert!(
                             "[Sell]\t*Stop monitoring\t*Mint: {}\t*Target {} sold token before our filter",
-                            sell_event.mint, sell_event.user
+                            sell_event.mint,
+                            sell_event.user
                         );
                         let _ = TOKEN_DB.delete(sell_event.mint);
                         continue;

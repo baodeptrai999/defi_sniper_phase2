@@ -102,7 +102,7 @@ impl PumpFunSwapAccounts {
     }
 
     pub fn get_sol_ix(&self) -> Instruction {
-        let slippage_calculated_buy_amount = *BUY_AMOUNT_SOL as f64 * 10f64.powi(9) * 1.5;
+        let slippage_calculated_buy_amount = *BUY_AMOUNT_SOL as f64 * 10f64.powi(9) * *SLIPPAGE;
         let turncated_slippage_calculated_buy_amount =
             slippage_calculated_buy_amount.trunc() as u64;
         let transfer_ix = system_instruction::transfer(
@@ -114,7 +114,7 @@ impl PumpFunSwapAccounts {
     }
 
     pub fn get_half_copy_sol_ix(&self, amount: f64) -> Instruction {
-        let slippage_calculated_buy_amount = amount * 1.5;
+        let slippage_calculated_buy_amount = amount * *SLIPPAGE;
         let turncated_slippage_calculated_buy_amount =
             slippage_calculated_buy_amount.trunc() as u64;
         let transfer_ix = system_instruction::transfer(
@@ -130,7 +130,7 @@ impl PumpFunSwapAccounts {
 
         let base_out: f64 = (*BUY_AMOUNT_SOL / token_price) * 10f64.powi(6);
         let truncated_base_out: u64 = base_out.trunc() as u64;
-        let max_quote_in: f64 = *BUY_AMOUNT_SOL as f64 * 10f64.powi(9) * 1.5;
+        let max_quote_in: f64 = *BUY_AMOUNT_SOL as f64 * 10f64.powi(9) * *SLIPPAGE;
         let turncated_max_quote_in: u64 = max_quote_in.trunc() as u64;
 
         data.extend_from_slice(&PUMP_FUN_BUY_DISCRIMINATOR);
@@ -168,7 +168,7 @@ impl PumpFunSwapAccounts {
 
         let base_out: f64 = ((sol_amount / 10f64.powi(9)) / token_price) * 10f64.powi(6);
         let truncated_base_out: u64 = base_out.trunc() as u64;
-        let max_quote_in: f64 = sol_amount * 1.5;
+        let max_quote_in: f64 = sol_amount * *SLIPPAGE;
         let turncated_max_quote_in: u64 = max_quote_in.trunc() as u64;
 
         data.extend_from_slice(&PUMP_FUN_BUY_DISCRIMINATOR);
