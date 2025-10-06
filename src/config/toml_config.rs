@@ -99,3 +99,10 @@ pub struct MonitorConfig {
     pub stop_no_activity_token_monitoring: bool,
     pub no_activity_time: i64,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct ShutDownConfig {
+    pub auto_shut_down: bool,
+    pub shut_down_time: String,
+    pub shut_down_sell_all: bool,
+}

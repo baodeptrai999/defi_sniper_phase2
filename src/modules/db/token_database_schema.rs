@@ -36,10 +36,9 @@ impl TokenDatabaseSchema {
         tx_id: String,
     ) -> Self {
         info!(
-            "[{}]\t\t*Mint: {}\n\t*Tx: {:?}",
+            "[{}]\t\t\t*Mint: {}",
             "Mint".blue(),
             mint_event.mint.to_string(),
-            solscan!(tx_id)
         );
 
         let initial_token_price = (mint_event.virtual_sol_reserves as f64 / 10f64.powi(9))

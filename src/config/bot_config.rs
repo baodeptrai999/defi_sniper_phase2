@@ -1,6 +1,6 @@
 use crate::*;
-use std::sync::Arc;
 use lazy_static::lazy_static;
+use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 use solana_client::rpc_client::RpcClient;
@@ -10,7 +10,7 @@ use solana_sdk::{
     pubkey::Pubkey,
     signer::{Signer, keypair::Keypair},
 };
-use std::sync::atomic::{AtomicI32, Ordering, AtomicBool};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 use colored::*;
 use console::Emoji;
@@ -72,7 +72,8 @@ pub static ZERO_SLOT_API_KEY: Lazy<String> =
 pub static BUY_AMOUNT_SOL: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.buy_amount_sol);
 
 //Slippage
-pub static SLIPPAGE: Lazy<f64> = Lazy::new(|| 1.0 + CONFIG.slippage_config.slippage_percent as f64 / 100.0);
+pub static SLIPPAGE: Lazy<f64> =
+    Lazy::new(|| 1.0 + CONFIG.slippage_config.slippage_percent as f64 / 100.0);
 pub static HALF_COPY_PCNT_MODE: Lazy<bool> = Lazy::new(|| CONFIG.buy_setting.half_copy_pcnt_mode);
 pub static BUY_AMOUNT_PERCENT: Lazy<u32> = Lazy::new(|| CONFIG.buy_setting.buy_amount_percent);
 
@@ -119,9 +120,14 @@ pub static STOP_NO_ACTIVITY_TOKEN_MONITORING: Lazy<bool> =
     Lazy::new(|| CONFIG.monitor_setting.stop_no_activity_token_monitoring);
 pub static NO_ACTIVITY_TIME: Lazy<i64> = Lazy::new(|| CONFIG.monitor_setting.no_activity_time);
 
-// timer (Auto turn off)
+// [shut_down_setting]
+pub static AUTO_SHUT_DOWN: Lazy<bool> = Lazy::new(|| CONFIG.shut_down_setting.auto_shut_down);
+pub static SHUT_DOWN_TIMER_SELL_ALL: Lazy<bool> =
+    Lazy::new(|| CONFIG.shut_down_setting.shut_down_sell_all);
+pub static SHUT_DOWN_TIME: Lazy<String> =
+    Lazy::new(|| CONFIG.shut_down_setting.shut_down_time.clone());
 
-lazy_static!{
+lazy_static! {
     pub static ref AUTO_TURNOFF: AtomicBool = AtomicBool::new(false);
 }
 
@@ -140,7 +146,10 @@ pub fn show_bot_settings() {
     log!("Min volume limit: {:?} SOL", *MIN_VOLUME_LIMIT_SOL);
     log!("Marketcap filter: {:?}", *MARKET_CAP_FILTER);
     log!("Min marketcap limit: {:?} SOL", *MIN_MARKET_CAP_LIMIT_SOL);
-    log!("Stop no activity token monitoring: {:?}", *STOP_NO_ACTIVITY_TOKEN_MONITORING);
+    log!(
+        "Stop no activity token monitoring: {:?}",
+        *STOP_NO_ACTIVITY_TOKEN_MONITORING
+    );
     log!("No activity time: {:?} seconds", *NO_ACTIVITY_TIME);
 
     init_validator();

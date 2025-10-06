@@ -1,6 +1,8 @@
-use pumpfun_sniper::*;
-use yellowstone_grpc_proto::geyser::SubscribeRequestFilterTransactions;
 use colored::*;
+use pumpfun_sniper::*;
+use std::sync::atomic::Ordering;
+use tokio::time::{Duration, interval};
+use yellowstone_grpc_proto::geyser::SubscribeRequestFilterTransactions;
 
 #[tokio::main]
 pub async fn main() {
@@ -27,6 +29,20 @@ pub async fn main() {
         }
     });
 
+    let mut interval = interval(Duration::from_millis(500));
+
+    tokio::spawn({
+        async move {
+            loop {
+                interval.tick().await;
+                let start_selling = check_auto_turn_off_time("sniper_mode");
+                if start_selling {
+                    AUTO_TURNOFF.store(true, Ordering::Relaxed);
+                };
+            }
+        }
+    });
+
     let mut grpc_client = setup_grpc_client(GRPC_ENDPOINT.to_string(), GRPC_TOKEN.to_string())
         .await
         .unwrap();
@@ -45,5 +61,5 @@ pub async fn main() {
         .await
         .unwrap();
 
-      let _ = process_half_copy_mode(subscribe_rx).await;
+    let _ = process_half_copy_mode(subscribe_rx).await;
 }

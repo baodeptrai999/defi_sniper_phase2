@@ -62,11 +62,10 @@ pub fn black_list_filter(mut token_data: TokenDatabaseSchema) -> bool {
 
             if !blacklist_valid {
                 let _ = TOKEN_DB.delete(token_data.token_mint);
-            }else{
+            } else {
                 token_data.token_is_blacklisted = TokenBlacklistInfo::NotBlacklistedToken;
                 let _ = TOKEN_DB.upsert(token_data.token_mint, token_data);
             }
-            println!("Blacklist info: {}", blacklist_valid);
         }
     }
     blacklist_valid
@@ -89,12 +88,11 @@ pub fn max_token_holder_check(token_data: TokenDatabaseSchema) -> bool {
             {
                 if let Some(second) = data.get(1) {
                     if let Some(val) = second.amount.ui_amount {
+                        println!("Max holder amount (second): {}", val);
                         if val > *MAX_TOKEN_HOLDER_LIMIT as f64 {
                             error!(
                                 "[FILTER] => MINT : {}\t* MAX HOLDING {:?} LIMIT {}",
-                                token_data.token_mint,
-                                second.amount.ui_amount,
-                                *MAX_TOKEN_HOLDER_LIMIT
+                                token_data.token_mint, val, *MAX_TOKEN_HOLDER_LIMIT
                             );
                             max_token_holder_valid = false;
                         }
@@ -102,10 +100,11 @@ pub fn max_token_holder_check(token_data: TokenDatabaseSchema) -> bool {
                 }
             } else {
                 if let Some(val) = first.amount.ui_amount {
+                    println!("Max holder amount (first): {}", val);
                     if val > *MAX_TOKEN_HOLDER_LIMIT as f64 {
                         error!(
                             "[FILTER] => MINT : {}\t* MAX HOLDING {:?} LIMIT {}",
-                            token_data.token_mint, first.amount.ui_amount, *MAX_TOKEN_HOLDER_LIMIT
+                            token_data.token_mint, val, *MAX_TOKEN_HOLDER_LIMIT
                         );
                         max_token_holder_valid = false;
                     }

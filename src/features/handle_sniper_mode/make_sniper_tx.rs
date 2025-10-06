@@ -38,7 +38,6 @@ pub fn make_sniper_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSchema
             && sniper_buy_filter_check(token_data.clone())
         {
             let buy_tx_remaining_counter = get_buy_tx_remain_counter();
-            println!("Buy remain counter: {}", buy_tx_remaining_counter);
 
             if !*DEV_MODE || buy_tx_remaining_counter != 0 {
                 decrese_buy_tx_remain_counter();
@@ -55,13 +54,11 @@ pub fn make_sniper_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSchema
                 let create_ata_ix = token_data
                     .pump_fun_swap_accounts
                     .get_create_ata_idempotent_ix();
-                let transfer_sol_ix = token_data.pump_fun_swap_accounts.get_sol_ix();
                 let buy_ix = token_data
                     .pump_fun_swap_accounts
                     .get_buy_ix(token_data.token_price);
 
                 ix.push(create_ata_ix);
-                ix.push(transfer_sol_ix);
                 ix.push(buy_ix);
 
                 let building_tx_time = build_tx_start.elapsed();

@@ -21,11 +21,11 @@ pub async fn check_no_activity_tokens() {
                             let _ = TOKEN_DB.upsert(token_key, token_data.clone());
 
                             let tag = format!(
-                                "[Sell]\t*Stop monitoring\t*Mint: {}\t*No activity in last {} seconds",
+                                "[Sell]\t*Stop monitoring\t\t*Mint: {}\t*No activity in last {} seconds",
                                 token_key, *NO_ACTIVITY_TIME
                             );
                             alert!(
-                                "[Sell]\t*Stop monitoring\t*Mint: {}\t*No activity in last {} seconds",
+                                "[Sell]\t*Stop monitoring\t\t*Mint: {}\t*No activity in last {} seconds",
                                 token_key,
                                 *NO_ACTIVITY_TIME
                             );
@@ -43,7 +43,7 @@ pub async fn check_no_activity_tokens() {
                         }
                     } else {
                         alert!(
-                            "[Stop-Tracking]\t*Mint: {}\t*No activity in last {} seconds",
+                            "[Stop-Tracking]\t\t*Mint: {}\t*No activity in last {} seconds",
                             token_key,
                             *NO_ACTIVITY_TIME
                         );

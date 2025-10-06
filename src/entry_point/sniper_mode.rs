@@ -1,6 +1,8 @@
 use colored::*;
 use pumpfun_sniper::*;
 use yellowstone_grpc_proto::geyser::SubscribeRequestFilterTransactions;
+use tokio::time::{Duration, interval};
+use std::sync::atomic::Ordering;
 
 #[tokio::main]
 pub async fn main() {
@@ -15,6 +17,20 @@ pub async fn main() {
         async {
             loop {
                 recent_blockhash_handler().await;
+            }
+        }
+    });
+
+    let mut interval = interval(Duration::from_millis(500));
+
+    tokio::spawn({
+        async move {
+            loop {
+                interval.tick().await;
+                let start_selling = check_auto_turn_off_time("sniper_mode");
+                if start_selling {
+                    AUTO_TURNOFF.store(true, Ordering::Relaxed);
+                };
             }
         }
     });

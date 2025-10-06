@@ -25,6 +25,14 @@ impl TokenDatabase {
         Ok(self.map.get(&key).map(|data| data.clone()))
     }
 
+    pub fn get_list_all(&self) -> Result<Vec<(Pubkey, TokenDatabaseSchema)>, BoxError> {
+        let mut results = Vec::new();
+        for r in self.map.iter() {
+            results.push((r.key().clone(), r.value().clone()));
+        }
+        Ok(results)
+    }
+
     pub fn delete(&self, key: Pubkey) -> Result<(), BoxError> {
         self.map.remove(&key);
         Ok(())

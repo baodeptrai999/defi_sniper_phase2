@@ -101,30 +101,6 @@ impl PumpFunSwapAccounts {
         create_token_ata
     }
 
-    pub fn get_sol_ix(&self) -> Instruction {
-        let slippage_calculated_buy_amount = *BUY_AMOUNT_SOL as f64 * 10f64.powi(9) * *SLIPPAGE;
-        let turncated_slippage_calculated_buy_amount =
-            slippage_calculated_buy_amount.trunc() as u64;
-        let transfer_ix = system_instruction::transfer(
-            &*SIGNER_PUBKEY,
-            &self.bonding_curve,
-            turncated_slippage_calculated_buy_amount,
-        );
-        transfer_ix
-    }
-
-    pub fn get_half_copy_sol_ix(&self, amount: f64) -> Instruction {
-        let slippage_calculated_buy_amount = amount * *SLIPPAGE;
-        let turncated_slippage_calculated_buy_amount =
-            slippage_calculated_buy_amount.trunc() as u64;
-        let transfer_ix = system_instruction::transfer(
-            &*SIGNER_PUBKEY,
-            &self.bonding_curve,
-            turncated_slippage_calculated_buy_amount,
-        );
-        transfer_ix
-    }
-
     pub fn get_buy_ix(&mut self, token_price: f64) -> Instruction {
         let mut data = Vec::new();
 

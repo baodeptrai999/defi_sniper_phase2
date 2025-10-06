@@ -22,7 +22,7 @@ pub fn update_status_from_buy_event(
     token_data.last_event = LastEvent {
         tx_hash: tx_id.clone(),
         last_tracked_event: TokenEvent::BuyTokenEvent,
-        last_activity_timestamp: buy_event.timestamp
+        last_activity_timestamp: buy_event.timestamp,
     };
 
     info!(
@@ -99,7 +99,8 @@ pub fn update_status_from_sell_event(
         None
     };
 
-    if *RUG_DETECT && token_data.last_event.tx_hash == tx_id
+    if *RUG_DETECT
+        && token_data.last_event.tx_hash == tx_id
         && token_data.last_event.last_tracked_event == TokenEvent::BuyTokenEvent
     {
         token_data.bundle_tx_counter += 1;
@@ -117,7 +118,7 @@ pub fn update_status_from_sell_event(
     token_data.last_event = LastEvent {
         tx_hash: tx_id.clone(),
         last_tracked_event: TokenEvent::SellTokenEvent,
-        last_activity_timestamp: sell_event.timestamp
+        last_activity_timestamp: sell_event.timestamp,
     };
 
     info!(
@@ -154,7 +155,17 @@ pub fn update_status_from_sell_event(
             None
         }
     } else {
-        let _ = TOKEN_DB.upsert(sell_event.mint.clone(), token_data.clone());
-        Some(token_data.clone())
+        if token_data.bundle_tx_counter >= *BUNDLE_TX_LIMIT {
+            warning!(
+                "[RUG]\t*Stop tracking\t*Mint: {}\t*Bundle_counter: {}",
+                token_data.token_mint,
+                token_data.bundle_tx_counter
+            );
+            let _ = TOKEN_DB.delete(token_data.token_mint);
+            None
+        } else {
+            let _ = TOKEN_DB.upsert(sell_event.mint.clone(), token_data.clone());
+            Some(token_data.clone())
+        }
     }
 }

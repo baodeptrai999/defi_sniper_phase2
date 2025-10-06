@@ -23,6 +23,7 @@ pub struct Config {
   pub fee_config: FeeConfig,
   pub filter_setting: FilterSetting,
   pub monitor_setting: MonitorConfig,
+  pub shut_down_setting: ShutDownConfig
 }
 
 pub static CONFIG: Lazy<Config> = Lazy::new(||{
