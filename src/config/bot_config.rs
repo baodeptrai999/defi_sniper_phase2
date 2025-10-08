@@ -68,7 +68,8 @@ pub static ZERO_SLOT_API_KEY: Lazy<String> =
 
 //Buy setting
 pub static BUY_AMOUNT_SOL: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.buy_amount_sol);
-pub static HALF_COPY_PCNT_MODE: Lazy<bool> = Lazy::new(|| CONFIG.buy_setting.half_copy_pcnt_mode);
+pub static HALF_COPY_PCNT_MODE: Lazy<bool> = Lazy::new(|| CONFIG.buy_setting.half_copy_mode_pcnt_buy);
+pub static COPY_PCNT_MODE: Lazy<bool> = Lazy::new(|| CONFIG.buy_setting.copy_mode_pcnt_buy);
 pub static BUY_AMOUNT_PERCENT: Lazy<u32> = Lazy::new(|| CONFIG.buy_setting.buy_amount_percent);
 pub static ONE_TIME_COPY: Lazy<bool> = Lazy::new(|| CONFIG.buy_setting.one_time_copy);
 

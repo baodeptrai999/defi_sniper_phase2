@@ -34,13 +34,16 @@ pub struct RelayerConfig {
 #[derive(Debug, Deserialize)]
 pub struct BuySetting {
     pub buy_amount_sol: f64,
-    pub half_copy_pcnt_mode: bool,
+    pub half_copy_mode_pcnt_buy: bool,
+    pub copy_mode_pcnt_buy: bool,
     pub buy_amount_percent: u32,
     pub one_time_copy: bool,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SellSetting {
+    pub copy_mode_sell_amount_percent: f64,
+    pub copy_mode_take_profit: f64,
     pub take_profit_1: f64,
     pub take_profit_1_sell_percentage: f64,
     pub take_profit_2: f64,

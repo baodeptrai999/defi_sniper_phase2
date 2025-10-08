@@ -1,6 +1,9 @@
 use crate::*;
 use once_cell::sync::Lazy;
 
+pub static SELL_AMOUNT_PCNT: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.copy_mode_sell_amount_percent);
+pub static COPY_MODE_TAKE_PROFIT: Lazy<f64> = Lazy::new(||CONFIG.sell_setting.copy_mode_take_profit / 100.0);
+
 pub static TAKE_PROFIT_1: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.take_profit_1 / 100.0);
 pub static TAKE_PROFIT_1_PCNT: Lazy<f64> =
     Lazy::new(|| CONFIG.sell_setting.take_profit_1_sell_percentage / 100.0);

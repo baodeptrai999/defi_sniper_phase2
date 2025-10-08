@@ -25,6 +25,7 @@ pub struct TokenDatabaseSchema {
     pub token_sniper_status: TokenSniperStatus,
     pub token_copy_trade_status: TokenCopyTradeStatus,
     pub target_buy_amount: Option<u64>,
+    pub target_sell_amount: Option<u64>,
     pub token_sell_status: TokenSellStatus,
     pub bundle_tx_counter: i32,
     pub token_is_blacklisted: TokenBlacklistInfo,
@@ -82,14 +83,15 @@ impl TokenDatabaseSchema {
             last_event: LastEvent {
                 tx_hash: tx_id,
                 last_tracked_event: TokenEvent::MintTokenEvent,
-                last_activity_timestamp: mint_event.timestamp
+                last_activity_timestamp: mint_event.timestamp,
             },
             token_sniper_status: TokenSniperStatus::TokenMinted,
             token_copy_trade_status: TokenCopyTradeStatus::None,
             target_buy_amount: None,
+            target_sell_amount: None,
             token_sell_status: TokenSellStatus::None,
             bundle_tx_counter: 0,
-            token_is_blacklisted: TokenBlacklistInfo::None
+            token_is_blacklisted: TokenBlacklistInfo::None,
         };
         let _ = TOKEN_DB.upsert(mint_event.mint.clone(), token_data.clone());
         token_data
@@ -138,14 +140,15 @@ impl TokenDatabaseSchema {
             last_event: LastEvent {
                 tx_hash: tx_id,
                 last_tracked_event: TokenEvent::BuyTokenEvent,
-                last_activity_timestamp: buy_event.timestamp
+                last_activity_timestamp: buy_event.timestamp,
             },
             token_sniper_status: TokenSniperStatus::None,
             token_copy_trade_status: TokenCopyTradeStatus::TargetBought,
             target_buy_amount: Some(target_amount),
+            target_sell_amount: None,
             token_sell_status: TokenSellStatus::None,
             bundle_tx_counter: 0,
-            token_is_blacklisted: TokenBlacklistInfo::None
+            token_is_blacklisted: TokenBlacklistInfo::None,
         };
         let _ = TOKEN_DB.upsert(buy_event.mint.clone(), token_data.clone());
         token_data
@@ -403,6 +406,60 @@ impl TokenDatabaseSchema {
             );
         }
     }
+
+    pub fn update_sell_state_flag_copy_mode(&mut self, tx_id: String) {
+        if self.token_balance > 0 {
+            self.tp_state = if self.token_price
+                > self.token_buying_point_price * *COPY_MODE_TAKE_PROFIT
+                && self.tp_state < TPMode::CopyModeTp
+            {
+                update!(
+                    "[TP_UPDATED]\t*MINT: {}
+                    \t*TP STATE: {:?} -> {:?},
+                    \t*MC VARIANT: {} SOL (BUY) -> {} SOL (NOW)",
+                    self.pump_fun_swap_accounts.mint,
+                    self.tp_state,
+                    TPMode::CopyModeTp,
+                    self.token_buying_point_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
+                    self.token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
+                );
+                TPMode::CopyModeTp
+            } else if self.token_price < self.token_buying_point_price * *STOP_LOSS
+                && self.tp_state < TPMode::SL
+            {
+                update!(
+                    "[TP_UPDATED]\t*MINT: {}
+                    \t*TP STATE: {:?} -> {:?},
+                    \t*MC VARIANT: {} SOL (BUY) -> {} SOL (NOW)",
+                    self.pump_fun_swap_accounts.mint,
+                    self.tp_state,
+                    TPMode::SL,
+                    self.token_buying_point_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
+                    self.token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
+                );
+                TPMode::SL
+            } else {
+                self.tp_state.clone()
+            };
+
+            dev_log!(
+                "[POOL STATE UPDATE]\t*MINT {:<12} ,
+                \t*TX HASH: {}
+                \t*CURRENT MC: {:.5} SOL , PEAK MC: {:.5} SOL, BUYING POINT MC: {:.5} SOL
+                \t*PRICE VARIANT PCNT: {:3.5} % , FALL PCNT: {:3.5} %
+                \t*ts_state: {:?} , tp_state: {:?}",
+                &self.pump_fun_swap_accounts.mint.to_string(),
+                solscan!(tx_id),
+                &self.token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
+                &self.token_peak_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
+                &self.token_buying_point_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
+                &self.token_price * 100.0 / &self.token_buying_point_price,
+                100.0 * (&self.token_peak_price - &self.token_price) / &self.token_peak_price,
+                self.ts_state,
+                self.tp_state,
+            );
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Copy)]
@@ -428,6 +485,7 @@ pub enum TPMode {
     TP3,
     TP4,
     TP5,
+    CopyModeTp,
     SL,
 }
 
@@ -443,15 +501,15 @@ pub enum TokenCopyTradeStatus {
     None,
     TargetBought,
     TargetSold,
-    CopyTradeSubmitted
+    CopyTradeSubmitted,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Copy)]
 
-pub enum TokenBlacklistInfo{
+pub enum TokenBlacklistInfo {
     None,
     NotBlacklistedToken,
-    BlacklistedToken
+    BlacklistedToken,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Copy)]
@@ -489,7 +547,7 @@ pub struct TPSellingPlan {
 pub struct LastEvent {
     pub tx_hash: String,
     pub last_tracked_event: TokenEvent,
-    pub last_activity_timestamp: i64
+    pub last_activity_timestamp: i64,
 }
 
 #[derive(Debug, Clone)]

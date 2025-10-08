@@ -25,7 +25,7 @@ pub async fn make_sniper_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabase
             );
 
             warning!(
-                "Sell]\t*{}\t*Mint: {}\t*Price: {}\t*Amount: {}",
+                "[Sell]\t*{}\t*Mint: {}\t*Price: {}\t*Amount: {}",
                 "RUG DETECTED".yellow(),
                 token_data.pump_fun_swap_accounts.mint,
                 token_data.token_price,
@@ -49,6 +49,8 @@ pub async fn make_sniper_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabase
                 token_data.token_sniper_status = TokenSniperStatus::SniperTradeSubmitted;
                 let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
 
+                let sniper_buy_amount = *BUY_AMOUNT_SOL as f64 * 10f64.powi(9);
+
                 let build_tx_start = Instant::now();
                 let mut ix: Vec<Instruction> = Vec::new();
                 let create_ata_ix = token_data
@@ -56,7 +58,7 @@ pub async fn make_sniper_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabase
                     .get_create_ata_idempotent_ix();
                 let buy_ix = token_data
                     .pump_fun_swap_accounts
-                    .get_buy_ix(token_data.token_price);
+                    .get_buy_ix(sniper_buy_amount, token_data.token_price);
 
                 ix.push(create_ata_ix);
                 ix.push(buy_ix);

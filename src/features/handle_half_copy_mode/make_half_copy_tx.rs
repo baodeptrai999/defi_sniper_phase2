@@ -72,7 +72,7 @@ pub async fn make_half_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatab
                     .get_create_ata_idempotent_ix();
                 let buy_ix = token_data
                     .pump_fun_swap_accounts
-                    .get_half_copy_buy_ix(half_copy_trade_amount, token_data.token_price);
+                    .get_buy_ix(half_copy_trade_amount, token_data.token_price);
 
                 ix.push(create_ata_ix);
                 ix.push(buy_ix);
@@ -95,7 +95,7 @@ pub async fn make_half_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatab
                 );
 
                 info!(
-                    "[Buy]\t*Mint: {}\t*Price: {}\t*Amount: {} SOL",
+                    "[Buy]\t*Mint: {}\t*Price: {}\t*Amount: {:.5} SOL",
                     token_data.pump_fun_swap_accounts.mint,
                     token_data.token_price,
                     half_copy_trade_amount as f64 / 10f64.powi(9)

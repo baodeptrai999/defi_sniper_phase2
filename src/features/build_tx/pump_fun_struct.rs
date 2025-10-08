@@ -101,45 +101,7 @@ impl PumpFunSwapAccounts {
         create_token_ata
     }
 
-    pub fn get_buy_ix(&mut self, token_price: f64) -> Instruction {
-        let mut data = Vec::new();
-
-        let base_out: f64 = (*BUY_AMOUNT_SOL / token_price) * 10f64.powi(6);
-        let truncated_base_out: u64 = base_out.trunc() as u64;
-        let max_quote_in: f64 = *BUY_AMOUNT_SOL as f64 * 10f64.powi(9) * *SLIPPAGE;
-        let turncated_max_quote_in: u64 = max_quote_in.trunc() as u64;
-
-        data.extend_from_slice(&PUMP_FUN_BUY_DISCRIMINATOR);
-        data.extend_from_slice(&truncated_base_out.to_le_bytes());
-        data.extend_from_slice(&turncated_max_quote_in.to_le_bytes());
-
-        let accounts = vec![
-            AccountMeta::new_readonly(self.global, false), // #1 - Global
-            AccountMeta::new(self.fee_recipient, false),   // #2 - Fee Recipient
-            AccountMeta::new_readonly(self.mint, false),   // #3 - Mint
-            AccountMeta::new(self.bonding_curve, false),   // #4 - BondingCurve
-            AccountMeta::new(self.associated_bonding_curve, false), // #5 - Quote Mint (TSFart)
-            AccountMeta::new(self.associated_user, false), // #6 - Associated User
-            AccountMeta::new(self.user, true),             // #7 - User
-            AccountMeta::new_readonly(self.system_program, false), // #8 - System Program
-            AccountMeta::new_readonly(self.token_program, false), // #9 - Token Program
-            AccountMeta::new(self.creator_vault, false),   // #10 - Creator Vault
-            AccountMeta::new_readonly(self.event_authority, false), // #11 - Event authority
-            AccountMeta::new_readonly(self.program, false), // #12 - Pump.fun program
-            AccountMeta::new(self.global_volume_accumulator.unwrap(), false), // #13 - Global volume accumulator
-            AccountMeta::new(self.user_volume_accumulator.unwrap(), false), // #14 - User volume accumulator
-            AccountMeta::new_readonly(self.fee_config, false),              // #15 - Fee Config
-            AccountMeta::new_readonly(self.fee_program, false),             //#16 - Fee Program
-        ];
-
-        Instruction {
-            program_id: PUMPFUN_PROGRAM_ID,
-            accounts,
-            data,
-        }
-    }
-
-    pub fn get_half_copy_buy_ix(&mut self, sol_amount: f64, token_price: f64) -> Instruction {
+    pub fn get_buy_ix(&mut self, sol_amount: f64, token_price: f64) -> Instruction {
         let mut data = Vec::new();
 
         let base_out: f64 = ((sol_amount / 10f64.powi(9)) / token_price) * 10f64.powi(6);

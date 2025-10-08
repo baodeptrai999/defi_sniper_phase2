@@ -32,5 +32,9 @@ name = "sniper_mode"
 path = "src/entry_point/sniper_mode.rs"
 
 [[bin]]
+name = "copy_mode"
+path = "src/entry_point/copy_mode.rs"                        
+
+[[bin]]
 name = "half_copy_mode"
 path = "src/entry_point/half_copy_mode.rs"
