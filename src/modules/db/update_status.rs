@@ -1,5 +1,6 @@
 use crate::*;
 use colored::*;
+use std::collections::HashSet;
 
 pub fn update_status_from_buy_event(
     mut token_data: TokenDatabaseSchema,
@@ -24,6 +25,10 @@ pub fn update_status_from_buy_event(
         last_tracked_event: TokenEvent::BuyTokenEvent,
         last_activity_timestamp: buy_event.timestamp,
     };
+
+    let mut unique_holders: HashSet<_> = token_data.token_holders.iter().cloned().collect();
+    unique_holders.insert(buy_event.user.to_string());
+    token_data.token_holders = unique_holders.into_iter().collect();
 
     info!(
         "[{}]\t*Mint: {}\t*MC: {:.2} SOL\t{}",
@@ -84,6 +89,7 @@ pub fn update_status_from_buy_event(
 pub fn update_status_from_sell_event(
     mut token_data: TokenDatabaseSchema,
     sell_event: SellEvent,
+    sell_ix_accounts: SellInstructionAccounts,
     tx_id: String,
 ) -> Option<TokenDatabaseSchema> {
     let updated_token_price = (sell_event.virtual_sol_reserves as f64 / 10f64.powi(9))
@@ -120,6 +126,25 @@ pub fn update_status_from_sell_event(
         last_tracked_event: TokenEvent::SellTokenEvent,
         last_activity_timestamp: sell_event.timestamp,
     };
+
+    let token_account_balance =
+        RPC_CLIENT.get_token_account_balance(&sell_ix_accounts.associated_user);
+        match token_account_balance {
+            Ok(balance) => {
+                if let Some(amount) = balance.ui_amount {
+                    if amount <= 0.0 {
+                        if let Some(pos) = token_data.token_holders.iter().position(|x| *x == sell_event.user.to_string()) {
+                            token_data.token_holders.remove(pos);
+                        }
+                    }
+                }
+            }
+            Err(_) => {
+                if let Some(pos) = token_data.token_holders.iter().position(|x| *x == sell_event.user.to_string()) {
+                    token_data.token_holders.remove(pos);
+                }
+            }
+        }
 
     info!(
         "[{}]\t*Mint: {}\t*MC: {:.2} SOL\t{}",

@@ -42,7 +42,7 @@ pub async fn make_sniper_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabase
             if !*DEV_MODE || buy_tx_remaining_counter != 0 {
                 decrese_buy_tx_remain_counter();
 
-                if !max_token_holder_check(token_data.clone()).await {
+                if !max_token_holder_check_and_all_holders(token_data.clone()).await {
                     continue;
                 }
 

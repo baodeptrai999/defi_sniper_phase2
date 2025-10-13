@@ -107,6 +107,7 @@ pub async fn handle_half_copy_events(
             if let Some(updated_token_data) = update_status_from_sell_event(
                 token_data.clone(),
                 sell_event.clone(),
+                sell_ixs_accounts[i].clone(),
                 tx_id.to_string(),
             ) {
                 return_data.insert(updated_token_data.token_mint, updated_token_data);

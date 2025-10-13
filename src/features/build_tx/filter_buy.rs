@@ -41,21 +41,18 @@ pub async fn black_list_filter(mut token_data: TokenDatabaseSchema) -> bool {
             let wallet_blacklist = WALLET_BLACKLIST.read().await;
             let token_blacklist = TOKEN_BLACKLIST.read().await;
             if wallet_blacklist.contains(&token_data.token_creator.to_string()) {
-                warning!(
-                    "Token creator is blacklisted wallet: {}",
-                    &token_data
-                        .pump_fun_swap_accounts
-                        .creator_vault
-                        .to_string()
-                        .red()
+                error!(
+                    "Token creator is blacklisted wallet\t*creator: {}\t*mint: {}",
+                    &token_data.token_creator.to_string().red(),
+                    &token_data.token_mint.to_string().yellow()
                 );
                 blacklist_valid = false;
                 token_data.token_is_blacklisted = TokenBlacklistInfo::BlacklistedToken;
             }
 
             if token_blacklist.contains(&token_data.token_mint.to_string()) {
-                warning!(
-                    "Token is blacklisted token: {}",
+                error!(
+                    "Token is blacklisted token\t*mint: {}",
                     &token_data.token_mint.to_string().red()
                 );
                 blacklist_valid = false;
@@ -73,7 +70,8 @@ pub async fn black_list_filter(mut token_data: TokenDatabaseSchema) -> bool {
     blacklist_valid
 }
 
-pub async fn max_token_holder_check(token_data: TokenDatabaseSchema) -> bool {
+pub async fn max_token_holder_check_and_top_twenty_holders(token_data: TokenDatabaseSchema) -> bool {
+    // println!("{:?} total: {:?}", token_data.token_holders.clone(), token_data.token_holders.clone().len());
     let mut max_token_holder_valid = true;
     let mut holder_is_blacklisted = false;
 
@@ -93,6 +91,72 @@ pub async fn max_token_holder_check(token_data: TokenDatabaseSchema) -> bool {
                 break;
             }
         }
+
+        if !holder_is_blacklisted {
+            if let Some(first) = data.get(0) {
+                if first.address
+                    == token_data
+                        .pump_fun_swap_accounts
+                        .associated_bonding_curve
+                        .to_string()
+                {
+                    if let Some(second) = data.get(1) {
+                        if let Some(val) = second.amount.ui_amount {
+                            println!("Max holder amount (second): {}", val);
+                            if val > *MAX_TOKEN_HOLDER_LIMIT as f64 {
+                                error!(
+                                    "[FILTER] => MINT : {}\t* MAX HOLDING {:?} LIMIT {}",
+                                    token_data.token_mint, val, *MAX_TOKEN_HOLDER_LIMIT
+                                );
+                                max_token_holder_valid = false;
+                            }
+                        }
+                    }
+                } else {
+                    if let Some(val) = first.amount.ui_amount {
+                        println!("Max holder amount (first): {}", val);
+                        if val > *MAX_TOKEN_HOLDER_LIMIT as f64 {
+                            error!(
+                                "[FILTER] => MINT : {}\t* MAX HOLDING {:?} LIMIT {}",
+                                token_data.token_mint, val, *MAX_TOKEN_HOLDER_LIMIT
+                            );
+                            max_token_holder_valid = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !max_token_holder_valid || holder_is_blacklisted {
+        let _ = TOKEN_DB.delete(token_data.token_mint);
+    }
+
+    max_token_holder_valid && !holder_is_blacklisted
+}
+
+pub async fn max_token_holder_check_and_all_holders(token_data: TokenDatabaseSchema) -> bool {
+    let mut max_token_holder_valid = true;
+    let mut holder_is_blacklisted = false;
+
+    // println!("{:?} total: {:?}", token_data.token_holders.clone(), token_data.token_holders.clone().len());
+
+    if *MAX_TOKEN_HOLDER_FILTER {        
+        let wallet_blacklist = WALLET_BLACKLIST.read().await;
+        for holder in token_data.token_holders.iter() {
+            if wallet_blacklist.contains(&holder) {
+                holder_is_blacklisted = true;
+                error!("[FILTER] => MINT : {}\t*BLACKLISTED HOLDER {:?}",
+                    token_data.token_mint, holder
+                );
+                break;
+            }
+        }
+
+        let data = match RPC_CLIENT.get_token_largest_accounts(&token_data.token_mint) {
+            Ok(data) => data,
+            Err(_) => vec![],
+        };
 
         if !holder_is_blacklisted {
             if let Some(first) = data.get(0) {
