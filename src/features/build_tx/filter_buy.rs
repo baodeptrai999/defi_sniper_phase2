@@ -73,24 +73,50 @@ pub async fn black_list_filter(mut token_data: TokenDatabaseSchema) -> bool {
     blacklist_valid
 }
 
-pub fn max_token_holder_check(token_data: TokenDatabaseSchema) -> bool {
+pub async fn max_token_holder_check(token_data: TokenDatabaseSchema) -> bool {
     let mut max_token_holder_valid = true;
+    let mut holder_is_blacklisted = false;
+
     if *MAX_TOKEN_HOLDER_FILTER {
         let data = match RPC_CLIENT.get_token_largest_accounts(&token_data.token_mint) {
             Ok(data) => data,
             Err(_) => vec![],
         };
+        
+        let wallet_blacklist = WALLET_BLACKLIST.read().await;
+        for holder in data.iter() {
+            if wallet_blacklist.contains(&holder.address.clone()) {
+                holder_is_blacklisted = true;
+                error!("[FILTER] => MINT : {}\t*BLACKLISTED HOLDER {:?}",
+                    token_data.token_mint, holder.address
+                );
+                break;
+            }
+        }
 
-        if let Some(first) = data.get(0) {
-            if first.address
-                == token_data
-                    .pump_fun_swap_accounts
-                    .associated_bonding_curve
-                    .to_string()
-            {
-                if let Some(second) = data.get(1) {
-                    if let Some(val) = second.amount.ui_amount {
-                        println!("Max holder amount (second): {}", val);
+        if !holder_is_blacklisted {
+            if let Some(first) = data.get(0) {
+                if first.address
+                    == token_data
+                        .pump_fun_swap_accounts
+                        .associated_bonding_curve
+                        .to_string()
+                {
+                    if let Some(second) = data.get(1) {
+                        if let Some(val) = second.amount.ui_amount {
+                            println!("Max holder amount (second): {}", val);
+                            if val > *MAX_TOKEN_HOLDER_LIMIT as f64 {
+                                error!(
+                                    "[FILTER] => MINT : {}\t* MAX HOLDING {:?} LIMIT {}",
+                                    token_data.token_mint, val, *MAX_TOKEN_HOLDER_LIMIT
+                                );
+                                max_token_holder_valid = false;
+                            }
+                        }
+                    }
+                } else {
+                    if let Some(val) = first.amount.ui_amount {
+                        println!("Max holder amount (first): {}", val);
                         if val > *MAX_TOKEN_HOLDER_LIMIT as f64 {
                             error!(
                                 "[FILTER] => MINT : {}\t* MAX HOLDING {:?} LIMIT {}",
@@ -100,26 +126,13 @@ pub fn max_token_holder_check(token_data: TokenDatabaseSchema) -> bool {
                         }
                     }
                 }
-            } else {
-                if let Some(val) = first.amount.ui_amount {
-                    println!("Max holder amount (first): {}", val);
-                    if val > *MAX_TOKEN_HOLDER_LIMIT as f64 {
-                        error!(
-                            "[FILTER] => MINT : {}\t* MAX HOLDING {:?} LIMIT {}",
-                            token_data.token_mint, val, *MAX_TOKEN_HOLDER_LIMIT
-                        );
-                        max_token_holder_valid = false;
-                    }
-                }
             }
         }
     }
-    if !max_token_holder_valid {
+
+    if !max_token_holder_valid || holder_is_blacklisted {
         let _ = TOKEN_DB.delete(token_data.token_mint);
     }
 
-    if max_token_holder_valid {
-        println!("Max token holder limit passed");
-    }
-    max_token_holder_valid
+    max_token_holder_valid && !holder_is_blacklisted
 }
