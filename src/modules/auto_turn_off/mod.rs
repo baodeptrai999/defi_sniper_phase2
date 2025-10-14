@@ -2,7 +2,7 @@ use chrono::Local;
 use std::fs::{File, create_dir_all};
 use std::io::Write;
 
-use crate::{SHUT_DOWN_TIME, SHUT_DOWN_TIMER_SELL_ALL, TOKEN_DB, info};
+use crate::{info, SHUT_DOWN_TIME, SHUT_DOWN_TIMER_SELL_ALL, TOKEN_DB};
 
 pub fn check_auto_turn_off_time(mode: &str) -> bool {
     let now = Local::now();
@@ -46,7 +46,7 @@ pub fn check_auto_turn_off_time(mode: &str) -> bool {
         let current_time = now.format("%H:%M:%S").to_string();
         let comparing_time = format!("{}", *SHUT_DOWN_TIME);
         if current_time == comparing_time {
-            info!("[AUTO TURN OFF]\t*SELLING ALL TOKENS ... ");
+            info!("[AUTO TURN OFF]\t\t*SELLING ALL TOKENS ... ");
             return true;
         };
         format!("Shutdown Timer ENABLED : {}", *SHUT_DOWN_TIME)

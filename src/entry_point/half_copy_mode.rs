@@ -1,9 +1,9 @@
 use colored::*;
 use pumpfun_sniper::*;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use tokio::time::{Duration, interval};
 use yellowstone_grpc_proto::geyser::SubscribeRequestFilterTransactions;
-use std::path::PathBuf;
 
 #[tokio::main]
 pub async fn main() {
