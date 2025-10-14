@@ -18,7 +18,7 @@ pub async fn all_sell() {
             let tag = format!(
                 "[Sell]\t*AUTO_TURN_OFF_TIME\t*Mint: {}\t*MC: {}\t*Amount: {}",
                 token_data.pump_fun_swap_accounts.mint,
-                token_data.token_price,
+                token_data.token_marketcap,
                 token_data.token_balance
             );
             let _ = confirm(ix, tag).await;

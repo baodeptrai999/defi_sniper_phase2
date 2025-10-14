@@ -19,14 +19,14 @@ pub async fn make_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSc
             ix.push(sell_ix);
 
             let tag = format!(
-                "[ALL SELL]\t*RUG DETECTED\t*Mint: {}\t*Price: {}\t*Amount: {}",
+                "[ALL SELL]\t*RUG DETECTED\t*Mint: {}\t*MC: {}\t*Amount: {}",
                 token_data.pump_fun_swap_accounts.mint,
                 token_data.token_marketcap,
                 token_data.token_balance
             );
 
             warning!(
-                "[ALL SELL]\t*{}\t*Mint: {}\t*Price: {}\t*Amount: {}",
+                "[ALL SELL]\t*{}\t*Mint: {}\t*MC: {}\t*Amount: {}",
                 "RUG DETECTED".yellow(),
                 token_data.pump_fun_swap_accounts.mint,
                 token_data.token_marketcap,
@@ -88,14 +88,14 @@ pub async fn make_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSc
                 );
 
                 let tag = format!(
-                    "[Buy]\t*Mint: {}\t*Price: {}\t*Amount: {:.5} SOL",
+                    "[Buy]\t*Mint: {}\t*MC: {}\t*Amount: {:.5} SOL",
                     token_data.pump_fun_swap_accounts.mint,
                     token_data.token_marketcap,
                     copy_trade_buy_amount as f64 / 10f64.powi(9)
                 );
 
                 info!(
-                    "[Buy]\t*Mint: {}\t*Price: {}\t*Amount: {:.5} SOL",
+                    "[Buy]\t*Mint: {}\t*MC: {}\t*Amount: {:.5} SOL",
                     token_data.pump_fun_swap_accounts.mint,
                     token_data.token_marketcap,
                     copy_trade_buy_amount as f64 / 10f64.powi(9)
@@ -144,14 +144,14 @@ pub async fn make_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSc
             );
 
             let tag = format!(
-                "[Sell]\t*Mint: {}\t*Price: {}\t*Amount: {:.5} token",
+                "[Sell]\t*Mint: {}\t*MC: {}\t*Amount: {:.5} token",
                 token_data.pump_fun_swap_accounts.mint,
                 token_data.token_marketcap,
                 copy_trade_sell_amount as f64 / 10f64.powi(6)
             );
 
             info!(
-                "[Sell]\t*Mint: {}\t*Price: {}\t*Amount: {:.5} token",
+                "[Sell]\t*Mint: {}\t*MC: {}\t*Amount: {:.5} token",
                 token_data.pump_fun_swap_accounts.mint,
                 token_data.token_marketcap,
                 copy_trade_sell_amount as f64 / 10f64.powi(6)
@@ -171,14 +171,14 @@ pub async fn make_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSc
             let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
 
             let tag = format!(
-                "[SELL]\t*CopyModeTp triggered\t*Mint: {}\t*Price: {}\t*Amount: {}",
+                "[SELL]\t*CopyModeTp triggered\t*Mint: {}\t*MC: {}\t*Amount: {}",
                 token_data.pump_fun_swap_accounts.mint,
                 token_data.token_marketcap,
                 token_data.token_balance,
             );
 
             info!(
-                "[SELL]\t*CopyModeTp triggered\t*Mint: {}\t*Price: {}\t*Amount: {}",
+                "[SELL]\t*CopyModeTp triggered\t*Mint: {}\t*MC: {}\t*Amount: {}",
                 token_data.pump_fun_swap_accounts.mint,
                 token_data.token_marketcap,
                 token_data.token_balance
@@ -197,14 +197,14 @@ pub async fn make_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSc
             let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
 
             let tag = format!(
-                "[SELL]\t*SL triggered\t*Mint: {}\t*Price: {}\t*Amount: {}",
+                "[SELL]\t*SL triggered\t*Mint: {}\t*MC: {}\t*Amount: {}",
                 token_data.pump_fun_swap_accounts.mint,
                 token_data.token_marketcap,
                 token_data.token_balance,
             );
 
             info!(
-                "[SELL]\t*SL triggered\t*Mint: {}\t*Price: {}\t*Amount: {}",
+                "[SELL]\t*SL triggered\t*Mint: {}\t*MC: {}\t*Amount: {}",
                 token_data.pump_fun_swap_accounts.mint,
                 token_data.token_marketcap,
                 token_data.token_balance,
