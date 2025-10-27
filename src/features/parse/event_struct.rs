@@ -137,3 +137,21 @@ pub struct SellInstructionAccounts {
     pub fee_config: Pubkey,
     pub fee_program: Pubkey,
 }
+
+#[derive(Debug, Clone, BorshDeserialize)]
+pub struct PumpfunBondingCurve {
+    pub virtual_token_reserves: u64,
+    pub virtual_sol_reserves: u64,
+    pub real_token_reserves: u64,
+    pub real_sol_reserves: u64,
+    pub token_total_supply: u64,
+    pub complete: bool,
+    pub creator: Pubkey,
+}
+
+#[derive(Debug, Clone)]
+pub struct BondingCurveAccounts {
+    pub mint: Pubkey,
+    pub bonding_curve: Pubkey,
+    pub creator: Pubkey
+}

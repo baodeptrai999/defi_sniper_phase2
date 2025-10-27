@@ -1,15 +1,17 @@
 use colored::*;
 use pumpfun_sniper::*;
+use std::process;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use tokio::time::{Duration, interval};
 use yellowstone_grpc_proto::geyser::SubscribeRequestFilterTransactions;
-use std::path::PathBuf;
 
 #[tokio::main]
 pub async fn main() {
     info!("{}", COPY_MODE_STR.green());
     show_bot_settings().await;
 
+    init_http_client();
     init_jito().await;
     init_nozomi().await;
     init_zero_slot().await;
@@ -79,4 +81,15 @@ pub async fn main() {
         .unwrap();
 
     let _ = process_copy_mode(subscribe_rx).await;
+    
+    match all_sell().await {
+        Ok(()) => {
+            info!("TOKEN SOLD");
+            process::exit(0);
+        }
+        Err(_) => {
+            error!("[ERROR] => Error occured while SELLING");
+            process::exit(1);
+        }
+    }
 }

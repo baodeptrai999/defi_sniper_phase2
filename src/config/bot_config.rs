@@ -2,7 +2,7 @@ use crate::*;
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use once_cell::sync::Lazy;
-use solana_client::rpc_client::RpcClient;
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
     commitment_config::CommitmentLevel,
@@ -11,6 +11,7 @@ use solana_sdk::{
 };
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use tokio::sync::RwLock;
+use reqwest::Client;
 
 use crate::CONFIG;
 
@@ -41,6 +42,10 @@ pub static SIGNER_PUBKEY: Lazy<Pubkey> = Lazy::new(|| {
 //Target wallets
 pub static TARGET_WALLETS: Lazy<Vec<String>> =
     Lazy::new(|| CONFIG.target_config.target_wallets.clone());
+//HTTP endpoint
+pub static HTTP_CLIENT: Lazy<Arc<Client>> = Lazy::new(||{
+    Arc::new(Client::new())
+});
 
 //RPC endpoint
 pub static RPC_ENDPOINT: Lazy<String> = Lazy::new(|| CONFIG.connection_config.rpc_endpoint.clone());
@@ -87,7 +92,8 @@ pub static PRIORITY_FEE: Lazy<(u64, u64, f64)> = Lazy::new(|| {
 });
 
 //Filter
-pub static BLACK_LIST_FILTER: Lazy<bool> = Lazy::new(|| CONFIG.filter_setting.black_list_filter);
+pub static TOKEN_BLACK_LIST_FILTER: Lazy<bool> = Lazy::new(|| CONFIG.filter_setting.token_black_list_filter);
+pub static HOLDER_BLACK_LIST_FILTER: Lazy<bool> = Lazy::new(|| CONFIG.filter_setting.holder_black_list_filter);
 pub static WALLET_BLACKLIST_PATH: Lazy<String> =
     Lazy::new(|| CONFIG.filter_setting.wallet_blacklist_path.clone());
 pub static TOKEN_BLACKLIST_PATH: Lazy<String> =
@@ -136,7 +142,8 @@ pub async fn show_bot_settings() {
     log!("Grpc endpoint: {:?}", *GRPC_ENDPOINT);
     log!("Grpc token: {:?}", *GRPC_TOKEN);
     log!("RPC endpoint: {:?}", *RPC_ENDPOINT);
-    log!("Blacklist filter: {:?}", *BLACK_LIST_FILTER);
+    log!("Token blacklist filter: {:?}", *TOKEN_BLACK_LIST_FILTER);
+    log!("Holder blacklist filter: {:?}", *HOLDER_BLACK_LIST_FILTER);
     log!("Rug detect: {:?}", *RUG_DETECT);
     log!("Bundle tx limit: {:?}", *BUNDLE_TX_LIMIT);
     log!("Volume filter: {:?}", *VOLUME_FILTER);

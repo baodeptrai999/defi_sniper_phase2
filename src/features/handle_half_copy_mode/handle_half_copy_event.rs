@@ -38,6 +38,7 @@ pub async fn handle_half_copy_events(
                         token_data.clone(),
                         buy_event.clone(),
                         tx_id.to_string(),
+                        "Half_Copy_Mode".to_string(),
                     );
                     return_data.insert(updated_token_data.token_mint, updated_token_data);
                 } else {
@@ -45,6 +46,7 @@ pub async fn handle_half_copy_events(
                         token_data.clone(),
                         buy_event.clone(),
                         tx_id.to_string(),
+                        "Half_Copy_Mode".to_string(),
                     );
                     updated_token_data.token_copy_trade_status = TokenCopyTradeStatus::TargetBought;
                     let _ = TOKEN_DB.upsert(buy_event.mint.clone(), updated_token_data.clone());
@@ -64,6 +66,7 @@ pub async fn handle_half_copy_events(
                     token_data.clone(),
                     buy_event.clone(),
                     tx_id.to_string(),
+                    "Half_Copy_Mode".to_string(),
                 );
                 return_data.insert(updated_token_data.token_mint, updated_token_data);
             }
@@ -74,11 +77,11 @@ pub async fn handle_half_copy_events(
         if let Some(token_data) = TOKEN_DB.get(sell_event.mint).unwrap() {
             if !token_data.token_is_purchased
                 && TARGET_WALLETS.contains(&sell_event.user.to_string())
-                && !half_copy_buy_filter_check(token_data.clone())
+                && !buy_filter_check(token_data.clone(), "Half_Copy_Mode".to_string())
             {
                 let target_token_account_balance =
                     RPC_CLIENT.get_token_account_balance(&sell_ixs_accounts[i].associated_user);
-                match target_token_account_balance {
+                match target_token_account_balance.await {
                     Ok(balance) => {
                         if let Some(amount) = balance.ui_amount {
                             if amount <= 0.0 {
@@ -107,8 +110,8 @@ pub async fn handle_half_copy_events(
             if let Some(updated_token_data) = update_status_from_sell_event(
                 token_data.clone(),
                 sell_event.clone(),
-                sell_ixs_accounts[i].clone(),
                 tx_id.to_string(),
+                "Half_Copy_Mode".to_string(),
             ) {
                 return_data.insert(updated_token_data.token_mint, updated_token_data);
             }

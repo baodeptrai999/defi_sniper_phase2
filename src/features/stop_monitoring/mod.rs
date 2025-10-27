@@ -58,7 +58,7 @@ pub async fn check_no_activity_tokens() {
                         let ix_clone = ix.clone();
                         let tag_clone = tag.clone();
                         tokio::spawn(async move {
-                            let _ = confirm(ix_clone, tag_clone).await;
+                            let _ = send_zero_slot_transaction(ix_clone, tag_clone).await;
                         });
                     }
                 }

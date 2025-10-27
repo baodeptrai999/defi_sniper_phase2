@@ -7,8 +7,12 @@ pub const PUMPFUN_FEE_PROGRAM: Pubkey = pubkey!("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWt
 pub const PUMPFUN_GLOBAL_VOLUME_ACCUMULATOR: Pubkey =
     pubkey!("Hq2wp8uJ9jCPsYgNHex8RtqdvMPfVGoYwjvF1ATiwn2Y");
 pub const PUMPSWAP_PROGRAM: Pubkey = pubkey!("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
-
+pub const WSOL: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
 pub const PUMPFUN_MINT_AUTHORITY: Pubkey = pubkey!("TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM");
+pub const PUMPFUN_GLOBAL: Pubkey = pubkey!("4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf");
+pub const ASSOCIATED_PROGRAM: Pubkey = pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+pub const PUMP_FUN_EVENT_AUTHORITY: Pubkey = pubkey!("Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1");
 
 pub static CREATOR_VAULT_SEED: &[u8] = b"creator-vault";
 pub static USER_VOLUME_ACCUMULATOR_SEED: &[u8] = b"user_volume_accumulator";
+pub static PUMPFUN_BONDING_CURVE: &[u8] = b"bonding-curve";

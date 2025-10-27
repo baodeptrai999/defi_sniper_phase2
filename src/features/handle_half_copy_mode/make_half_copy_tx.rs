@@ -34,16 +34,16 @@ pub async fn make_half_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatab
             );
 
             (ix, tag)
-        } else if black_list_filter(token_data.clone()).await
+        } else if black_list_filter(token_data.clone(), "Half_Copy_Mode".to_string()).await
             && token_data.token_copy_trade_status == TokenCopyTradeStatus::TargetBought
-            && half_copy_buy_filter_check(token_data.clone())
+            && buy_filter_check(token_data.clone(), "Half_Copy_Mode".to_string())
         {
             let buy_tx_remaining_counter = get_buy_tx_remain_counter();
 
             if !*DEV_MODE || buy_tx_remaining_counter != 0 {
                 decrese_buy_tx_remain_counter();
 
-                if !max_token_holder_check_and_top_twenty_holders(token_data.clone()).await {
+                if !max_token_holder_check(token_data.clone(), "Half_Copy_Mode".to_string()).await {
                     continue;
                 }
 
@@ -412,7 +412,7 @@ pub async fn make_half_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatab
 
         if !ix.is_empty() {
             tokio::spawn(async move {
-                let _ = confirm(ix, tag).await;
+                let _ = send_zero_slot_transaction(ix, tag).await;
             });
         }
     }

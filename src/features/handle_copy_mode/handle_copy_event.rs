@@ -34,17 +34,19 @@ pub async fn handle_copy_events(
             );
             if let Some(token_data) = TOKEN_DB.get(buy_event.mint).unwrap() {
                 if *ONE_TIME_COPY {
-                    let updated_token_data = update_status_from_buy_event_copy_mode(
+                    let updated_token_data = update_status_from_buy_event(
                         token_data.clone(),
                         buy_event.clone(),
                         tx_id.to_string(),
+                        "Copy_Mode".to_string(),
                     );
                     return_data.insert(updated_token_data.token_mint, updated_token_data);
                 } else {
-                    let mut updated_token_data = update_status_from_buy_event_copy_mode(
+                    let mut updated_token_data = update_status_from_buy_event(
                         token_data.clone(),
                         buy_event.clone(),
                         tx_id.to_string(),
+                        "Copy_Mode".to_string(),
                     );
                     updated_token_data.token_copy_trade_status = TokenCopyTradeStatus::TargetBought;
                     updated_token_data.target_buy_amount = Some(buy_event.sol_amount);
@@ -61,10 +63,11 @@ pub async fn handle_copy_events(
             }
         } else {
             if let Some(token_data) = TOKEN_DB.get(buy_event.mint).unwrap() {
-                let updated_token_data: TokenDatabaseSchema = update_status_from_buy_event_copy_mode(
+                let updated_token_data: TokenDatabaseSchema = update_status_from_buy_event(
                     token_data.clone(),
                     buy_event.clone(),
                     tx_id.to_string(),
+                    "Copy_Mode".to_string(),
                 );
                 return_data.insert(updated_token_data.token_mint, updated_token_data);
             }
@@ -75,11 +78,11 @@ pub async fn handle_copy_events(
         if let Some(token_data) = TOKEN_DB.get(sell_event.mint).unwrap() {
             if !token_data.token_is_purchased
                 && TARGET_WALLETS.contains(&sell_event.user.to_string())
-                && !half_copy_buy_filter_check(token_data.clone())
+                && !buy_filter_check(token_data.clone(), "Copy_Mode".to_string())
             {
                 let target_token_account_balance =
                     RPC_CLIENT.get_token_account_balance(&sell_ixs_accounts[i].associated_user);
-                match target_token_account_balance {
+                match target_token_account_balance.await {
                     Ok(balance) => {
                         if let Some(amount) = balance.ui_amount {
                             if amount <= 0.0 {
@@ -112,8 +115,12 @@ pub async fn handle_copy_events(
                     sell_event.mint.to_string().green(),
                     solscan!(tx_id.to_string().purple())
                 );
-                let updated_token_data =
-                    update_status_from_sell_event_copy_mode(token_data, sell_event.clone(), tx_id.clone());
+                let updated_token_data = update_status_from_sell_event(
+                    token_data,
+                    sell_event.clone(),
+                    tx_id.clone(),
+                    "Copy_Mode".to_string(),
+                );
                 if let Some(mut updated_data) = updated_token_data {
                     updated_data.token_copy_trade_status = TokenCopyTradeStatus::TargetSold;
                     updated_data.target_sell_amount = Some(sell_event.token_amount);
@@ -121,10 +128,11 @@ pub async fn handle_copy_events(
 
                     return_data.insert(sell_event.mint, updated_data);
                 }
-            } else if let Some(updated_token_data) = update_status_from_sell_event_copy_mode(
+            } else if let Some(updated_token_data) = update_status_from_sell_event(
                 token_data.clone(),
                 sell_event.clone(),
                 tx_id.to_string(),
+                "Copy_Mode".to_string(),
             ) {
                 return_data.insert(updated_token_data.token_mint, updated_token_data);
             }

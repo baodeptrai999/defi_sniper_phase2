@@ -11,7 +11,6 @@ where
         match result {
             Ok(update) => {
                 if AUTO_TURNOFF.load(Ordering::Relaxed) {
-                    all_sell().await;
                     break;
                 };
                 let (account_keys, ixs, inner_ixs, tx_id, _signers) =

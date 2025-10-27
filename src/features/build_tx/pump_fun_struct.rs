@@ -31,6 +31,44 @@ pub struct PumpFunSwapAccounts {
 }
 
 impl PumpFunSwapAccounts {
+    pub fn from_bonding_curve_accounts(bonding_curve_accounts: BondingCurveAccounts) -> Self {
+        let (associated_bonding_curve, _) = Pubkey::find_program_address(
+            &[
+                bonding_curve_accounts.bonding_curve.as_ref(),
+                &spl_token::ID.as_ref(),
+                bonding_curve_accounts.mint.as_ref(),
+            ],
+            &ASSOCIATED_PROGRAM,
+        );
+
+        let associated_user =
+            get_associated_token_address_with_program_id(&SIGNER_PUBKEY, &bonding_curve_accounts.mint, &spl_token::ID);
+
+        let (creator_vault, _) = Pubkey::find_program_address(
+            &[CREATOR_VAULT_SEED, &bonding_curve_accounts.creator.as_ref()],
+            &PUMPFUN_PROGRAM_ID,
+        );
+
+        Self {
+            global: PUMPFUN_GLOBAL,
+            fee_recipient: PUMPFUN_FEE_RECIPIENT,
+            mint: bonding_curve_accounts.mint,
+            bonding_curve: bonding_curve_accounts.bonding_curve,
+            associated_bonding_curve: associated_bonding_curve,
+            associated_user: associated_user,
+            user: *SIGNER_PUBKEY,
+            system_program: system_program::ID,
+            token_program: spl_token::ID,
+            creator_vault: creator_vault,
+            event_authority: PUMP_FUN_EVENT_AUTHORITY,
+            program: PUMPFUN_PROGRAM_ID,
+            global_volume_accumulator: Some(PUMPFUN_GLOBAL_VOLUME_ACCUMULATOR),
+            user_volume_accumulator: Some(*PUMPFUN_USER_VOLUME_ACCUMULATOR),
+            fee_config: PUMPFUN_FEE_CONFIG,
+            fee_program: PUMPFUN_FEE_PROGRAM,
+        }
+    }
+
     pub fn from_mint(
         mint_instruction_account: &MintInstructionAccounts,
         mint_event: &MintEvent,

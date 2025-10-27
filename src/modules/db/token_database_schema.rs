@@ -1,6 +1,7 @@
 use crate::*;
 use colored::*;
 use solana_sdk::pubkey::Pubkey;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct TokenDatabaseSchema {
@@ -9,7 +10,7 @@ pub struct TokenDatabaseSchema {
     pub token_total_supply: u64,
     pub token_price: f64,
     pub token_peak_price: f64,
-    pub token_holders: Vec<String>,
+    pub token_holders: HashMap<Pubkey, u64>,
     pub token_is_purchased: bool,
     pub token_balance: u64,
     pub token_buying_point_price: f64,
@@ -47,7 +48,7 @@ impl TokenDatabaseSchema {
         let initial_token_price = (mint_event.virtual_sol_reserves as f64 / 10f64.powi(9))
             / (mint_event.virtual_token_reserves as f64 / 10f64.powi(6));
         let initial_token_marketcap = initial_token_price * mint_event.token_total_supply as f64;
-        let initial_token_holders = Vec::new();
+        let initial_token_holders = HashMap::new();
 
         let token_data = Self {
             token_mint: mint_event.mint,
@@ -109,7 +110,8 @@ impl TokenDatabaseSchema {
             / (buy_event.virtual_token_reserves as f64 / 10f64.powi(6));
         let token_marketcap = token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
         let target_amount: u64 = buy_event.sol_amount;
-        let monitored_token_holders = vec![buy_event.user.to_string()];
+        let mut monitored_token_holders = HashMap::new();
+        monitored_token_holders.insert(buy_event.user, buy_event.token_amount);
 
         let token_data = Self {
             token_mint: buy_event.mint,

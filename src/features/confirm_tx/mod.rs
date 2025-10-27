@@ -113,7 +113,8 @@ pub fn confirm(
                 return Some(confirmed_sig);
             } else {
                 // Recursive retry
-                return confirm(raw_instructions.clone(), tag.clone()).await;
+                // return confirm(raw_instructions.clone(), tag.clone()).await;
+                return None;
             }
         }
 
@@ -155,9 +156,9 @@ pub async fn wait_for_confirmation(signature_str: &str, tag: String) -> Option<S
     };
 
     let mut attempts = 0;
-
+    
     loop {
-        match RPC_CLIENT.get_signature_statuses(&[signature]) {
+        match RPC_CLIENT.get_signature_statuses(&[signature]).await {
             Ok(statuses) => {
                 if let Some(Some(status)) = statuses.value.get(0) {
                     if status.confirmations.is_none() || status.confirmations.unwrap_or(0) > 0 {
@@ -177,7 +178,7 @@ pub async fn wait_for_confirmation(signature_str: &str, tag: String) -> Option<S
         }
 
         attempts += 1;
-        if attempts >= 15 {
+        if attempts >= 10 {
             error!(
                 "[FORCE_CHECK]
                 \t* Check : https://solscan.io/tx/{}

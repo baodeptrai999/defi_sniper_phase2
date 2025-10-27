@@ -25,7 +25,7 @@ pub async fn recent_blockhash_handler() {
     loop {
         match RPC_CLIENT.get_latest_blockhash_with_commitment(CommitmentConfig {
             commitment: CommitmentLevel::Processed,
-        }) {
+        }).await {
             Ok((latest_blockhash, _)) => {
                 set_slot(latest_blockhash);
                 break;

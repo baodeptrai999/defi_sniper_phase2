@@ -86,7 +86,8 @@ pub struct FeeConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct FilterSetting {
-    pub black_list_filter: bool,
+    pub token_black_list_filter: bool,
+    pub holder_black_list_filter: bool,
     pub wallet_blacklist_path: String,
     pub rug_token_blacklist_path: String,
     pub rug_detect: bool,
