@@ -18,11 +18,10 @@ pub async fn watch_wallet_blacklist_file(file_path: PathBuf) -> Result<()> {
     // Create a Notify watcher in a blocking task
     let mut watcher = RecommendedWatcher::new(
         move |res: Result<Event>| {
-            // Send events into async channel, blocking send OK inside sync closure
-            tokio::runtime::Handle::current()
-                .block_on(async {
-                    tx.send(res).await.unwrap();
-                });
+            // Use blocking_send instead of trying to use async runtime
+            if let Err(e) = tx.blocking_send(res) {
+                eprintln!("Failed to send filesystem event: {}", e);
+            }
         },
         notify::Config::default(),
     )?;
@@ -32,8 +31,13 @@ pub async fn watch_wallet_blacklist_file(file_path: PathBuf) -> Result<()> {
 
     // Initial load of the blacklist
     {
-        let content = tokio::fs::read_to_string(&file_path).await.expect("Failed to read file initially");
-        let lines: Vec<String> = content.lines().map(|l| l.to_string()).unique().collect();
+        let content = tokio::fs::read_to_string(&file_path).await
+            .expect("Failed to read file initially");
+        let lines: Vec<String> = content.lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .unique()
+            .collect();
         let mut wl = WALLET_BLACKLIST.write().await;
         *wl = lines;
     }
@@ -43,14 +47,25 @@ pub async fn watch_wallet_blacklist_file(file_path: PathBuf) -> Result<()> {
         match res {
             Ok(event) => {
                 if event.kind.is_modify() {
-                    // On any modify, reload the file and update blacklist
-                    let content = tokio::fs::read_to_string(&file_path).await.expect("Failed to read file updated");
-                    let new_lines: Vec<String> = content.lines().map(|l| l.to_string()).unique().collect();
+                    // Small delay to ensure file write is complete
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    
+                    match tokio::fs::read_to_string(&file_path).await {
+                        Ok(content) => {
+                            let new_lines: Vec<String> = content.lines()
+                                .map(|l| l.trim().to_string())
+                                .filter(|l| !l.is_empty())
+                                .unique()
+                                .collect();
 
-                    let mut wl = WALLET_BLACKLIST.write().await;
-                    wl.extend(new_lines);
-                    wl.sort_unstable();
-                    wl.dedup();
+                            let mut wl = WALLET_BLACKLIST.write().await;
+                            *wl = new_lines;
+                            info!("Updated wallet blacklist with {} entries", wl.len());
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to read updated file: {}", e);
+                        }
+                    }
                 }
             }
             Err(e) => eprintln!("watch error: {:?}", e),
@@ -61,7 +76,7 @@ pub async fn watch_wallet_blacklist_file(file_path: PathBuf) -> Result<()> {
 }
 
 pub async fn watch_token_blacklist_file(file_path: PathBuf) -> Result<()> {
-    if !*TOKEN_BLACK_LIST_FILTER {
+    if !*TOKEN_BLACK_LIST_FILTER || !*HOLDER_BLACK_LIST_FILTER {
         return Ok(()); // feature disabled
     }
 
@@ -71,11 +86,10 @@ pub async fn watch_token_blacklist_file(file_path: PathBuf) -> Result<()> {
     // Create a Notify watcher in a blocking task
     let mut watcher = RecommendedWatcher::new(
         move |res: Result<Event>| {
-            // Send events into async channel, blocking send OK inside sync closure
-            tokio::runtime::Handle::current()
-                .block_on(async {
-                    tx.send(res).await.unwrap();
-                });
+            // Use blocking_send instead of trying to use async runtime
+            if let Err(e) = tx.blocking_send(res) {
+                eprintln!("Failed to send filesystem event: {}", e);
+            }
         },
         notify::Config::default(),
     )?;
@@ -85,9 +99,14 @@ pub async fn watch_token_blacklist_file(file_path: PathBuf) -> Result<()> {
 
     // Initial load of the blacklist
     {
-        let content = tokio::fs::read_to_string(&file_path).await.expect("Failed to read file initially");
-        let lines: Vec<String> = content.lines().map(|l| l.to_string()).unique().collect();
-        let mut wl = WALLET_BLACKLIST.write().await;
+        let content = tokio::fs::read_to_string(&file_path).await
+            .expect("Failed to read file initially");
+        let lines: Vec<String> = content.lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .unique()
+            .collect();
+        let mut wl = TOKEN_BLACKLIST.write().await;
         *wl = lines;
     }
 
@@ -96,14 +115,25 @@ pub async fn watch_token_blacklist_file(file_path: PathBuf) -> Result<()> {
         match res {
             Ok(event) => {
                 if event.kind.is_modify() {
-                    // On any modify, reload the file and update blacklist
-                    let content = tokio::fs::read_to_string(&file_path).await.expect("Failed to read file updated");
-                    let new_lines: Vec<String> = content.lines().map(|l| l.to_string()).unique().collect();
+                    // Small delay to ensure file write is complete
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    
+                    match tokio::fs::read_to_string(&file_path).await {
+                        Ok(content) => {
+                            let new_lines: Vec<String> = content.lines()
+                                .map(|l| l.trim().to_string())
+                                .filter(|l| !l.is_empty())
+                                .unique()
+                                .collect();
 
-                    let mut wl = WALLET_BLACKLIST.write().await;
-                    wl.extend(new_lines);
-                    wl.sort_unstable();
-                    wl.dedup();
+                            let mut wl = TOKEN_BLACKLIST.write().await;
+                            *wl = new_lines;
+                            info!("Updated wallet blacklist with {} entries", wl.len());
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to read updated file: {}", e);
+                        }
+                    }
                 }
             }
             Err(e) => eprintln!("watch error: {:?}", e),
