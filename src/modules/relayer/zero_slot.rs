@@ -15,7 +15,7 @@ pub fn init_http_client() {
 pub async fn send_zero_slot_transaction(
     raw_instructions: Vec<Instruction>,
     tag: String,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Option<String> {
     let start_time = Instant::now();
     let (cu, priority_fee_micro_lamport, _third_party_fee) = *PRIORITY_FEE;
 
@@ -67,24 +67,30 @@ pub async fn send_zero_slot_transaction(
         .post("http://la1.0slot.trade?api-key=335e371309b6492584368e9dc553622d")
         .json(&request_body)
         .send()
-        .await?;
-    let response_json: serde_json::Value = response.json().await?;
-    if let Some(result) = response_json.get("result") {
-        println!(
-            "Transaction(zero slot) submission took: {:?}",
-            tx_submission_start.elapsed()
-        );
-        info!(
-            "[SUBMIT]
-                \t* Service: ZERO_SLOT
-                \t* Hash: {:?}
-                \t* {}",
-            result,
-            tag.clone()
-        );
-    } else if let Some(error) = response_json.get("error") {
-        eprintln!("Failed to send transaction: {}", error);
+        .await;
+    match response {
+        Ok(response_data) => {
+            let response_json: serde_json::Value = response_data.json().await.unwrap();
+            if let Some(result) = response_json.get("result") {
+                println!(
+                    "Transaction(zero slot) submission took: {:?}",
+                    tx_submission_start.elapsed()
+                );
+                info!(
+                    "[SUBMIT]
+                        \t* Service: ZERO_SLOT
+                        \t* Hash: {:?}
+                        \t* {}",
+                    result,
+                    tag.clone()
+                );
+                return Some(result.to_string());
+            } else{
+                return None;
+            }
+        }
+        Err(_) => {
+            return None;
+        }
     }
-
-    Ok(())
 }

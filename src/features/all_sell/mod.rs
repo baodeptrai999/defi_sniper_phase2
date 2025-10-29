@@ -76,7 +76,7 @@ pub async fn all_sell() -> Result<(), Box<dyn std::error::Error>> {
                         ixs.push(create_ix);
                         ixs.push(swap_ix);
 
-                        let _ = send_zero_slot_transaction(
+                        let _ = confirm(
                             ixs,
                             format!("[AUTO_TURN_OFF]\t*Sell\t*Mint: {}", curve_accounts.mint),
                         )

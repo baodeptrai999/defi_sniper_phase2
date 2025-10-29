@@ -48,29 +48,30 @@ pub fn confirm(
                 }
             }
             "ZERO_SLOT" => {
-                let zero_slot = ZERO_SLOT_CLIENT
-                    .get()
-                    .expect("ZSlot client not initialized");
-                let ixs = zero_slot.add_tip_ix(Tips {
-                    cu: Some(cu),
-                    priority_fee_micro_lamport: Some(priority_fee_micro_lamport),
-                    payer: *SIGNER_PUBKEY,
-                    pure_ix: raw_instructions.clone(),
-                    tip_addr_idx: 1,
-                    tip_sol_amount: third_party_fee,
-                });
-                let recent_blockhash = get_slot();
-                let encoded_tx = zero_slot.build_v0_bs64(
-                    ixs,
-                    &*SIGNER_PUBKEY,
-                    &vec![&*SIGNER_KEYPAIR],
-                    recent_blockhash,
-                    None,
-                );
-                match zero_slot.send_transaction(&encoded_tx).await {
-                    Ok(data) => data.result,
-                    Err(err) => Some(err.to_string()),
-                }
+                // let zero_slot = ZERO_SLOT_CLIENT
+                //     .get()
+                //     .expect("ZSlot client not initialized");
+                // let ixs = zero_slot.add_tip_ix(Tips {
+                //     cu: Some(cu),
+                //     priority_fee_micro_lamport: Some(priority_fee_micro_lamport),
+                //     payer: *SIGNER_PUBKEY,
+                //     pure_ix: raw_instructions.clone(),
+                //     tip_addr_idx: 1,
+                //     tip_sol_amount: third_party_fee,
+                // });
+                // let recent_blockhash = get_slot();
+                // let encoded_tx = zero_slot.build_v0_bs64(
+                //     ixs,
+                //     &*SIGNER_PUBKEY,
+                //     &vec![&*SIGNER_KEYPAIR],
+                //     recent_blockhash,
+                //     None,
+                // );
+                // match zero_slot.send_transaction(&encoded_tx).await {
+                //     Ok(data) => data.result,
+                //     Err(err) => Some(err.to_string()),
+                // }
+                send_zero_slot_transaction(raw_instructions, tag.clone()).await
             }
             "JITO" => {
                 let jito = JITO_CLIENT.get().expect("Jito client not initialized");

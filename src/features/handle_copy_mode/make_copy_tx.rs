@@ -218,7 +218,7 @@ pub async fn make_copy_tx(trade_token_data_map: &DashMap<Pubkey, TokenDatabaseSc
 
         if !ix.is_empty() {
             tokio::spawn(async move {
-                let _ = send_zero_slot_transaction(ix, tag).await;
+                let _ = confirm(ix, tag).await;
             });
         }
     }
