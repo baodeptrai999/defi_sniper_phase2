@@ -7,7 +7,7 @@ use solana_sdk::pubkey::Pubkey;
 use tokio::time::{Duration, sleep};
 
 pub async fn all_sell() -> Result<(), Box<dyn std::error::Error>> {
-    let token_ata_data = match RPC_CLIENT
+    let v1_token_ata_data = match RPC_CLIENT
         .get_token_accounts_by_owner(
             &SIGNER_PUBKEY,
             TokenAccountsFilter::ProgramId(spl_token::ID),
@@ -18,8 +18,18 @@ pub async fn all_sell() -> Result<(), Box<dyn std::error::Error>> {
         Err(_) => vec![],
     };
 
-    let mints: Vec<Pubkey> = token_ata_data
-        .into_iter()
+    let v2_token_ata_data = match RPC_CLIENT
+        .get_token_accounts_by_owner(
+            &SIGNER_PUBKEY,
+            TokenAccountsFilter::ProgramId(TOKEN_2022_PROGRAM),
+        )
+        .await
+    {
+        Ok(data) => data,
+        Err(_) => vec![],
+    };
+
+    let mints: Vec<Pubkey> = v1_token_ata_data.iter().chain(v2_token_ata_data.iter())
         .filter_map(|account| {
             if let UiAccountData::Json(parsed_account) = &account.account.data {
                 parsed_account.parsed["info"]["mint"]
@@ -42,12 +52,13 @@ pub async fn all_sell() -> Result<(), Box<dyn std::error::Error>> {
 
         match RPC_CLIENT.get_account(&bonding_curve).await {
             Ok(data) => {
-                if let Ok(curve) = PumpfunBondingCurve::try_from_slice(&data.data[8..81]) {
+                if let Ok(curve) = PumpfunBondingCurve::try_from_slice(&data.data[8..82]) {
                     if !curve.complete {
                         let curve_keys = BondingCurveAccounts {
                             mint: *mint,
                             bonding_curve: bonding_curve,
                             creator: curve.creator,
+                            is_mayhem_mode: curve.is_mayhem_mode
                         };
                         pumpfun_keys.push(curve_keys);
                     }

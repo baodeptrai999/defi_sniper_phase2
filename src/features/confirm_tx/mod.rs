@@ -2,8 +2,8 @@ use crate::*;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use solana_relayer_adapter_rust::*;
-use solana_sdk::signature::{Signature};
-use solana_sdk::{instruction::Instruction};
+use solana_sdk::instruction::Instruction;
+use solana_sdk::signature::Signature;
 use tokio::time::{Duration, sleep};
 
 // --- Your Nozomi, ZSlot, Jito clients assumed imported here ---
@@ -141,7 +141,13 @@ pub fn confirm(
 }
 
 pub async fn wait_for_confirmation(signature_str: &str, tag: String) -> Option<Signature> {
-    let signature = match signature_str.parse::<Signature>() {
+    let trimed_clean_sig = signature_str
+        .trim()
+        .replace("\"", "")
+        .replace("'", "")
+        .replace("\n", "")
+        .replace("\r", "");
+    let signature = match trimed_clean_sig.parse::<Signature>() {
         Ok(sig) => sig,
         Err(_) => {
             error!(
@@ -149,7 +155,8 @@ pub async fn wait_for_confirmation(signature_str: &str, tag: String) -> Option<S
                 \t* Check : {}
                 \t* {}
                 \t* States : Invalid signature",
-                solscan!(signature_str), tag.clone()
+                solscan!(signature_str),
+                tag.clone()
             );
 
             return None;
@@ -157,7 +164,7 @@ pub async fn wait_for_confirmation(signature_str: &str, tag: String) -> Option<S
     };
 
     let mut attempts = 0;
-    
+
     loop {
         match RPC_CLIENT.get_signature_statuses(&[signature]).await {
             Ok(statuses) => {

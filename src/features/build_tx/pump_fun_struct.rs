@@ -32,17 +32,22 @@ pub struct PumpFunSwapAccounts {
 
 impl PumpFunSwapAccounts {
     pub fn from_bonding_curve_accounts(bonding_curve_accounts: BondingCurveAccounts) -> Self {
+        let token_program = if bonding_curve_accounts.is_mayhem_mode {
+            TOKEN_2022_PROGRAM
+        }else{
+            spl_token::ID
+        };
         let (associated_bonding_curve, _) = Pubkey::find_program_address(
             &[
                 bonding_curve_accounts.bonding_curve.as_ref(),
-                &spl_token::ID.as_ref(),
+                &token_program.as_ref(),
                 bonding_curve_accounts.mint.as_ref(),
             ],
             &ASSOCIATED_PROGRAM,
         );
 
         let associated_user =
-            get_associated_token_address_with_program_id(&SIGNER_PUBKEY, &bonding_curve_accounts.mint, &spl_token::ID);
+            get_associated_token_address_with_program_id(&SIGNER_PUBKEY, &bonding_curve_accounts.mint, &token_program);
 
         let (creator_vault, _) = Pubkey::find_program_address(
             &[CREATOR_VAULT_SEED, &bonding_curve_accounts.creator.as_ref()],
@@ -58,7 +63,7 @@ impl PumpFunSwapAccounts {
             associated_user: associated_user,
             user: *SIGNER_PUBKEY,
             system_program: system_program::ID,
-            token_program: spl_token::ID,
+            token_program: token_program,
             creator_vault: creator_vault,
             event_authority: PUMP_FUN_EVENT_AUTHORITY,
             program: PUMPFUN_PROGRAM_ID,
@@ -76,16 +81,22 @@ impl PumpFunSwapAccounts {
         let associated_user = get_associated_token_address_with_program_id(
             &SIGNER_PUBKEY,
             &mint_instruction_account.mint,
-            &spl_token::ID,
+            &mint_instruction_account.token_program,
         );
         let (creator_vault, _) = Pubkey::find_program_address(
             &[CREATOR_VAULT_SEED, &mint_event.creator.as_ref()],
             &PUMPFUN_PROGRAM_ID,
         );
 
+        let fee_recipient = if mint_event.is_mayhem_mode {
+            MAYHEM_FEE_RECIPIENT
+        }else{
+            PUMPFUN_FEE_RECIPIENT
+        };
+
         Self {
-            global: mint_instruction_account.global,
-            fee_recipient: PUMPFUN_FEE_RECIPIENT,
+            global: PUMPFUN_GLOBAL,
+            fee_recipient: fee_recipient,
             mint: mint_instruction_account.mint,
             bonding_curve: mint_instruction_account.bonding_curve,
             associated_bonding_curve: mint_instruction_account.associated_bonding_curve,
@@ -107,7 +118,7 @@ impl PumpFunSwapAccounts {
         let associated_user = get_associated_token_address_with_program_id(
             &SIGNER_PUBKEY,
             &buy_instruction_accounts.mint,
-            &spl_token::ID,
+            &buy_instruction_accounts.token_program,
         );
         Self {
             global: buy_instruction_accounts.global,

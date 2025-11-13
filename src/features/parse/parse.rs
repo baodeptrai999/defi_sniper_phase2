@@ -128,22 +128,28 @@ pub fn get_trade_info(
     let mut buy_events: Vec<BuyEvent> = Vec::new();
     let mut sell_events: Vec<SellEvent> = Vec::new();
     ix_infos.iter().for_each(|info| {
-        if info.data.starts_with(&PUMP_FUN_MINT_DISCRIMINATOR) {
+        if info.data.starts_with(&PUMP_FUN_CREATE_V1_DISCRIMINATOR) {
             let mint_accounts = MintInstructionAccounts {
                 mint: account_keys[info.accounts[0] as usize],
-                mint_authority: account_keys[info.accounts[1] as usize],
                 bonding_curve: account_keys[info.accounts[2] as usize],
                 associated_bonding_curve: account_keys[info.accounts[3] as usize],
-                global: account_keys[info.accounts[4] as usize],
-                mpl_token_metadata: account_keys[info.accounts[5] as usize],
-                metadata: account_keys[info.accounts[6] as usize],
                 user: account_keys[info.accounts[7] as usize],
                 system_program: account_keys[info.accounts[8] as usize],
                 token_program: account_keys[info.accounts[9] as usize],
                 associated_token_program: account_keys[info.accounts[10] as usize],
-                rent: account_keys[info.accounts[11] as usize],
                 event_authority: account_keys[info.accounts[12] as usize],
-                program: account_keys[info.accounts[13] as usize],
+            };
+            mint_instruction_accounts.push(mint_accounts);
+        } else if info.data.starts_with(&PUMP_FUN_CREATE_V2_DISCRIMINATOR) {
+            let mint_accounts = MintInstructionAccounts {
+                mint: account_keys[info.accounts[0] as usize],
+                bonding_curve: account_keys[info.accounts[2] as usize],
+                associated_bonding_curve: account_keys[info.accounts[3] as usize],
+                user: account_keys[info.accounts[5] as usize],
+                system_program: account_keys[info.accounts[6] as usize],
+                token_program: account_keys[info.accounts[7] as usize],
+                associated_token_program: account_keys[info.accounts[8] as usize],
+                event_authority: account_keys[info.accounts[14] as usize],
             };
             mint_instruction_accounts.push(mint_accounts);
         } else if info.data.starts_with(&PUMP_FUN_BUY_DISCRIMINATOR) {
@@ -204,7 +210,7 @@ pub fn get_trade_info(
             let mut data = &info.data[16..];
             let trade_event = TradeEvent::deserialize(&mut data).unwrap();
             if trade_event.is_buy {
-                let buy_event= BuyEvent {
+                let buy_event = BuyEvent {
                     mint: trade_event.mint,
                     sol_amount: trade_event.sol_amount,
                     token_amount: trade_event.token_amount,
@@ -222,8 +228,8 @@ pub fn get_trade_info(
                     creator_fee: trade_event.creator_fee,
                 };
                 buy_events.push(buy_event);
-            }else {
-                let sell_event= SellEvent {
+            } else {
+                let sell_event = SellEvent {
                     mint: trade_event.mint,
                     sol_amount: trade_event.sol_amount,
                     token_amount: trade_event.token_amount,

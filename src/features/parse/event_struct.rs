@@ -22,24 +22,20 @@ pub struct MintEvent {
     pub virtual_sol_reserves: u64,
     pub real_token_reserves: u64,
     pub token_total_supply: u64,
+    pub token_program: Pubkey,
+    pub is_mayhem_mode: bool
 }
 
 #[derive(Debug, Clone)]
 pub struct MintInstructionAccounts {
     pub mint: Pubkey,
-    pub mint_authority: Pubkey,
     pub bonding_curve: Pubkey,
     pub associated_bonding_curve: Pubkey,
-    pub global: Pubkey,
-    pub mpl_token_metadata: Pubkey,
-    pub metadata: Pubkey,
     pub user: Pubkey,
     pub system_program: Pubkey,
     pub token_program: Pubkey,
     pub associated_token_program: Pubkey,
-    pub rent: Pubkey,
     pub event_authority: Pubkey,
-    pub program: Pubkey,
 }
 
 #[derive(Debug, Clone, BorshDeserialize)]
@@ -147,11 +143,13 @@ pub struct PumpfunBondingCurve {
     pub token_total_supply: u64,
     pub complete: bool,
     pub creator: Pubkey,
+    pub is_mayhem_mode: bool
 }
 
 #[derive(Debug, Clone)]
 pub struct BondingCurveAccounts {
     pub mint: Pubkey,
     pub bonding_curve: Pubkey,
-    pub creator: Pubkey
+    pub creator: Pubkey,
+    pub is_mayhem_mode: bool
 }
