@@ -1,84 +1,237 @@
 use crate::*;
-// use colored::*;
-use dashmap::DashMap;
 use solana_sdk::pubkey::Pubkey;
+use std::collections::{HashMap, HashSet};
 
-pub async fn handle_sniper_event(
-    trade_data: (
-        bool,
-        Vec<MintEvent>,
-        Vec<BuyEvent>,
-        Vec<SellEvent>,
-        Vec<MintInstructionAccounts>,
-        Vec<BuyInstructionAccounts>,
-        Vec<SellInstructionAccounts>,
-    ),
+const MAX_BUY_TX_HISTORY: usize = 4;
+
+pub async fn handle_trade_events(
     budget_compute_data: (u32, u64),
+    pumpfun_trade_data: (
+        Vec<MintEvent>,
+        Vec<PumpfunBuyEvent>,
+        Vec<PumpfunSellEvent>,
+        Vec<MintInstructionAccounts>,
+        Vec<PumpfunBuyInstructionAccounts>,
+        Vec<PumpfunSellInstructionAccounts>,
+    ),
+    migration_data: (
+        Vec<MigrateInstructionAccounts>,
+        Vec<CreatePoolInstructionAccounts>,
+        Vec<CreatePoolEventData>,
+    ),
+    pumpswap_trade_data: (
+        Vec<PumpswapBuyEvent>,
+        Vec<PumpswapSellEvent>,
+        Vec<PumpswapBuyInstructionAccounts>,
+        Vec<PumpswapSellInstructionAccounts>,
+    ),
     tx_id: String,
-) -> DashMap<Pubkey, TokenDatabaseSchema> {
-    let (
-        is_bundler_buy,
-        mint_events,
-        buy_events,
-        sell_events,
-        mint_ixs_accounts,
-        _buy_ixs_accounts,
-        _sell_ixs_accounts,
-    ) = trade_data;
-
+) -> HashMap<Pubkey, TokenDatabaseSchema> {
     let (unit, price) = budget_compute_data;
 
-    let return_data: DashMap<Pubkey, TokenDatabaseSchema> = DashMap::new();
+    let (
+        mint_events,
+        pumpfun_buy_events,
+        pumpfun_sell_events,
+        mint_ixs_accounts,
+        _pumpfun_buy_ixs_accounts,
+        _pumpfun_sell_ixs_accounts,
+    ) = pumpfun_trade_data;
+
+    let (_migrate_instruction_accounts, create_pool_instruction_accounts, create_pool_event_data) =
+        migration_data;
+
+    let (
+        pumpswap_buy_events,
+        pumpswap_sell_events,
+        pumpswap_buy_ixs_accounts,
+        pumpswap_sell_ixs_accounts,
+    ) = pumpswap_trade_data;
+
+    let mut return_data: HashMap<Pubkey, TokenDatabaseSchema> = HashMap::new();
+    let patterns = get_cached_patterns();
+
+    // ── Mint events ──
+
+    let mut minted_in_this_tx: HashSet<Pubkey> = HashSet::new();
 
     for (i, mint_event) in mint_events.iter().enumerate() {
         let mint_ix_accounts = &mint_ixs_accounts[i];
-        match (unit, price) {
-            (_, 6666666) => {
-                println!(
-                    "Launched filtered token,\t*unit: {}\t*price: {}",
-                    unit, price
-                );
-                let token_data: TokenDatabaseSchema = TokenDatabaseSchema::new_from_mint(
-                    mint_event.clone(),
-                    mint_ix_accounts.clone(),
-                    (unit, price),
-                    tx_id.clone(),
-                );
 
-                //Time based buying logic after bundle finished
-                let token_data_clone = token_data.clone();
-                tokio::spawn(async move {
-                    let _ = proceed_time_based_buying_logic(token_data_clone).await;
-                });
+        let mint_pattern_matched = patterns.iter().any(|p| p.mint_pattern == (unit, price))
+            || MANUAL_MINT_PRICE_PATTERNS.contains(&price);
 
-                return_data.insert(token_data.token_mint, token_data);
-            }
-            _ => {}
+        if mint_pattern_matched {
+            let token_data = TokenDatabaseSchema::new_from_mint(
+                mint_event.clone(),
+                mint_ix_accounts.clone(),
+                (unit, price),
+                tx_id.clone(),
+            );
+
+            minted_in_this_tx.insert(token_data.token_mint);
+            return_data.insert(token_data.token_mint, token_data);
         }
     }
 
-    for (_i, buy_event) in buy_events.iter().enumerate() {
-        if let Some(token_data) = TOKEN_DB.get(buy_event.mint).unwrap() {
-            let updated_token_data: TokenDatabaseSchema = update_status_from_buy_event(
+    // ── Pumpfun Buy events: single pass for counting + state update ──
+
+    let mut buy_counts: HashMap<Pubkey, u8> = HashMap::new();
+
+    for pumpfun_buy_event in pumpfun_buy_events.iter() {
+        let mint = pumpfun_buy_event.mint;
+
+        if let Some(token_data) = TOKEN_DB.get(mint).unwrap() {
+            if !minted_in_this_tx.contains(&mint) {
+                if let Some(c) = buy_counts.get_mut(&mint) {
+                    *c += 1;
+                } else if token_data.buy_tx_history.len() < MAX_BUY_TX_HISTORY
+                    && matches!(
+                        token_data.token_trade_signal,
+                        TokenTradeSignal::None | TokenTradeSignal::EntrySubmitted
+                    )
+                {
+                    buy_counts.insert(mint, 1);
+                }
+            }
+
+            let updated = update_status_from_pumpfun_buy_event(
+                token_data,
+                pumpfun_buy_event.clone(),
+                tx_id.clone(),
+            );
+            return_data.insert(updated.token_mint, updated);
+        }
+    }
+
+    // ── Pattern match check for eligible mints ──
+
+    for (mint, buy_count) in buy_counts {
+        if let Some(mut token_data) = TOKEN_DB.get(mint).unwrap() {
+            token_data.buy_tx_history.push(((unit, price), buy_count));
+
+            let mint_pat = (
+                token_data.mint_budget_compute_unit_limit,
+                token_data.mint_budget_compute_unit_price,
+            );
+            let history = &token_data.buy_tx_history;
+
+            if let Some(pattern) = patterns
+                .iter()
+                .find(|p| p.mint_pattern == mint_pat && p.buy_pattern == *history)
+            {
+                let primary_tp_threshold = pattern.primary_tp_threshold();
+                token_data.set_tp_sell_strategy(
+                    pattern.tp_threshold.clone(),
+                    pattern.sell_amounts.clone(),
+                );
+
+                match token_data.token_trade_signal {
+                    TokenTradeSignal::None => {
+                        info!(
+                            "🎯 Buy pattern matched!\n\t*MINT: {}\n\t*mint_pattern: {:?}\n\t*buy_pattern: {:?}\n\t*agent_tp_thresholds: {:?}%\n\t*real_tp_threshold(primary): {:?}%\n\t*sell_amounts: {:?}%\n\t*net_profit: {:.4}\n\t*token_count: {}\n\t*avg_profit: {:.4}\n\t*win_rate_low: {}\n\t*W/L: {}/{}\n\t*win_rate: {:.2}%",
+                            mint,
+                            pattern.mint_pattern,
+                            pattern.buy_pattern,
+                            pattern.tp_threshold,
+                            primary_tp_threshold * *REAL_TP_MULTIPLY,
+                            pattern.sell_amounts,
+                            pattern.net_profit,
+                            pattern.token_count,
+                            pattern.avg_profit,
+                            pattern.win_rate_low,
+                            pattern.win_count,
+                            pattern.loss_count,
+                            pattern.win_rate,
+                        );
+                        token_data.token_trade_signal = TokenTradeSignal::IsEntryPoint;
+                    }
+                    TokenTradeSignal::EntrySubmitted => {
+                        info!(
+                            "🔄 Longer pattern matched, updating TP\n\t*MINT: {}\n\t*buy_pattern: {:?}\n\t*new agent tp_thresholds: {:?}%\n\t*new real tp_threshold(primary): {:?}%",
+                            mint,
+                            pattern.buy_pattern,
+                            pattern.tp_threshold,
+                            primary_tp_threshold * *REAL_TP_MULTIPLY,
+                        );
+                    }
+                    _ => {}
+                }
+            }
+
+            let _ = TOKEN_DB.upsert(mint, token_data.clone());
+            return_data.insert(mint, token_data);
+        }
+    }
+
+    // ── Pumpfun Sell events ──
+
+    for pumpfun_sell_event in pumpfun_sell_events.iter() {
+        if let Some(token_data) = TOKEN_DB.get(pumpfun_sell_event.mint).unwrap() {
+            if let Some(updated) = update_status_from_pumpfun_sell_event(
+                token_data,
+                pumpfun_sell_event.clone(),
+                tx_id.clone(),
+            ) {
+                return_data.insert(updated.token_mint, updated);
+            }
+        }
+    }
+
+    // handle migration instructions
+    for (pool_accounts, pool_event) in create_pool_instruction_accounts
+        .iter()
+        .zip(create_pool_event_data.iter())
+    {
+        if let Some(token_data) = TOKEN_DB.get(pool_accounts.base_mint).unwrap() {
+            let updated_token_data = update_status_from_migration_event(
                 token_data.clone(),
-                buy_event.clone(),
-                is_bundler_buy,
+                pool_accounts.clone(),
+                pool_event.clone(),
                 tx_id.to_string(),
             );
             return_data.insert(updated_token_data.token_mint, updated_token_data);
         }
     }
 
-    for (_i, sell_event) in sell_events.iter().enumerate() {
-        if let Some(token_data) = TOKEN_DB.get(sell_event.mint).unwrap() {
-            if let Some(updated_token_data) = update_status_from_sell_event(
+    //handle pumpswap instructions
+    for (i, pumpswap_buy_event) in pumpswap_buy_events.iter().enumerate() {
+        if let Some(token_data) = TOKEN_DB
+            .get(pumpswap_buy_ixs_accounts[i].base_mint)
+            .unwrap()
+        {
+            let updated_token_data = update_status_from_pumpswap_buy_event(
                 token_data.clone(),
-                sell_event.clone(),
+                pumpswap_buy_event.clone(),
+                pumpswap_buy_ixs_accounts[i].clone(),
                 tx_id.to_string(),
-            ) {
-                return_data.insert(updated_token_data.token_mint, updated_token_data);
+            );
+            return_data.insert(updated_token_data.token_mint, updated_token_data);
+        }
+    }
+
+    for (i, pumpswap_sell_event) in pumpswap_sell_events.iter().enumerate() {
+        if let Some(token_data) = TOKEN_DB
+            .get(pumpswap_sell_ixs_accounts[i].base_mint)
+            .unwrap()
+        {
+            let updated_token_data = update_status_from_pumpswap_sell_event(
+                token_data,
+                pumpswap_sell_event.clone(),
+                pumpswap_sell_ixs_accounts[i].clone(),
+                tx_id.clone(),
+            );
+
+            if let Some(updated_data) = updated_token_data {
+                let _ = TOKEN_DB.upsert(
+                    pumpswap_sell_ixs_accounts[i].base_mint.clone(),
+                    updated_data.clone(),
+                );
+
+                return_data.insert(pumpswap_sell_ixs_accounts[i].base_mint, updated_data);
             }
         }
     }
+
     return_data
 }

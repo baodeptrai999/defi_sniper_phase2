@@ -1,31 +1,8 @@
 use crate::*;
 use once_cell::sync::Lazy;
 
-pub static TAKE_PROFIT_1: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.take_profit_1 / 100.0);
-pub static TAKE_PROFIT_1_PCNT: Lazy<f64> =
-    Lazy::new(|| CONFIG.sell_setting.take_profit_1_sell_percentage / 100.0);
-pub static TAKE_PROFIT_2: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.take_profit_2 / 100.0);
-pub static TAKE_PROFIT_2_PCNT: Lazy<f64> =
-    Lazy::new(|| CONFIG.sell_setting.take_profit_2_sell_percentage / 100.0);
-pub static TAKE_PROFIT_3: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.take_profit_3 / 100.0);
-pub static TAKE_PROFIT_3_PCNT: Lazy<f64> =
-    Lazy::new(|| CONFIG.sell_setting.take_profit_3_sell_percentage / 100.0);
-pub static TAKE_PROFIT_4: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.take_profit_4 / 100.0);
-pub static TAKE_PROFIT_4_PCNT: Lazy<f64> =
-    Lazy::new(|| CONFIG.sell_setting.take_profit_4_sell_percentage / 100.0);
-pub static TAKE_PROFIT_5: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.take_profit_5 / 100.0);
-pub static TAKE_PROFIT_5_PCNT: Lazy<f64> =
-    Lazy::new(|| CONFIG.sell_setting.take_profit_5_sell_percentage / 100.0);
-
-pub static STOP_LOSS_1: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.stop_loss_1 / 100.0);
-pub static STOP_LOSS_1_PCNT: Lazy<f64> =
-    Lazy::new(|| CONFIG.sell_setting.stop_loss_1_sell_percentage / 100.0);
-pub static STOP_LOSS_2: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.stop_loss_2 / 100.0);
-pub static STOP_LOSS_2_PCNT: Lazy<f64> =
-    Lazy::new(|| CONFIG.sell_setting.stop_loss_2_sell_percentage / 100.0);
-pub static STOP_LOSS_3: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.stop_loss_3 / 100.0);
-pub static STOP_LOSS_3_PCNT: Lazy<f64> =
-    Lazy::new(|| CONFIG.sell_setting.stop_loss_3_sell_percentage / 100.0);
+pub static STOP_LOSS: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.stop_loss / 100.0);
+pub static REAL_TP_MULTIPLY: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.real_tp_multiply / 100.0);
 
 pub static TS_1: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.trailing_1 / 100.0);
 pub static TS_2: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.trailing_2 / 100.0);
@@ -78,17 +55,10 @@ pub static VALID_TS_STOP: Lazy<bool> = Lazy::new(|| {
 });
 
 pub static VALID_TS: Lazy<bool> = Lazy::new(|| {
-    if !(*STOP_LOSS_3 < *STOP_LOSS_2
-        && *STOP_LOSS_2 < *STOP_LOSS_1
-        && *STOP_LOSS_1 < *TS_1
-        && *TS_1 < *TS_2
-        && *TS_2 < *TS_3
-        && *TS_3 < *TS_4
-        && *TS_4 < *TS_5)
-    {
+    if !(*STOP_LOSS < *TS_1 && *TS_1 < *TS_2 && *TS_2 < *TS_3 && *TS_3 < *TS_4 && *TS_4 < *TS_5) {
         error!(
-            "[ERROR] => Invalid Order\n\t* STOP_LOSS_3 : {:5.3}\n\tSTOP_LOSS_2 : {:5.3}\n\tSTOP_LOSS_1 : {:5.3}\n\t* TS_1 : {:5.3}\n\t* TS_2 : {:5.3}\n\t* TS_3 : {:5.3}\n\t* TS_4 : {:5.3}\n\t* TS_5 : {:5.3}",
-            *STOP_LOSS_3, *STOP_LOSS_2, *STOP_LOSS_1, *TS_1, *TS_2, *TS_3, *TS_4, *TS_5
+            "[ERROR] => Invalid Order\n\tSTOP_LOSS : {:5.3}\n\t* TS_1 : {:5.3}\n\t* TS_2 : {:5.3}\n\t* TS_3 : {:5.3}\n\t* TS_4 : {:5.3}\n\t* TS_5 : {:5.3}",
+            *STOP_LOSS, *TS_1, *TS_2, *TS_3, *TS_4, *TS_5
         );
         panic!("INVALID CONFIG: TS Range");
     };

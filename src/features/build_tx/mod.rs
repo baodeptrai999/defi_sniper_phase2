@@ -1,5 +1,7 @@
-pub mod pump_fun_struct;
-pub mod get_swap_accounts;
+pub mod pumpfun_struct;
+pub mod get_custom_accounts;
+pub mod pumpswap_struct;
 
-pub use pump_fun_struct::*;
-pub use get_swap_accounts::*;
+pub use pumpfun_struct::*;
+pub use get_custom_accounts::*;
+pub use pumpswap_struct::*;

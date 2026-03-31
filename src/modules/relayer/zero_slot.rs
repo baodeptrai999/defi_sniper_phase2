@@ -1,9 +1,11 @@
 use crate::*;
 use base64;
 use serde_json::json;
+#[allow(deprecated)]
+use solana_sdk::system_instruction;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction, instruction::Instruction, pubkey::Pubkey,
-    system_instruction, transaction::Transaction,
+    transaction::Transaction,
 };
 use std::str::FromStr;
 use std::time::Instant;
@@ -12,7 +14,6 @@ pub async fn send_zero_slot_transaction(
     raw_instructions: Vec<Instruction>,
     tag: String,
 ) -> Option<String> {
-    let start_time = Instant::now();
     let (cu, priority_fee_micro_lamport, third_party_fee) = *PRIORITY_FEE;
 
     let mut total_instruction = Vec::new();
@@ -33,7 +34,6 @@ pub async fn send_zero_slot_transaction(
     );
     total_instruction.push(tip_transfer_instruction);
     let mut transaction = Transaction::new_with_payer(&total_instruction, Some(&SIGNER_PUBKEY));
-    info!("Total ix build took: {:?}", start_time.elapsed());
     // Sign the transaction with the sender's keypair
     transaction
         .try_sign(&[SIGNER_KEYPAIR.insecure_clone()], get_slot())
@@ -41,8 +41,6 @@ pub async fn send_zero_slot_transaction(
 
     let serialized_transaction = bincode::serialize(&transaction).unwrap();
     let base64_encoded_transaction = base64::encode(serialized_transaction);
-
-    info!("Signing and serializing took: {:?}", start_time.elapsed());
 
     // Build the JSON-RPC request
     let request_body = json!({
@@ -57,10 +55,9 @@ pub async fn send_zero_slot_transaction(
             }
         ]
     });
-    info!("TX making: {:?}", start_time.elapsed());
     let tx_submission_start = Instant::now();
     let response = ZERO_SLOT_HTTP_CLIENT
-        .post("http://la1.0slot.trade?api-key=335e371309b6492584368e9dc553622d")
+        .post("http://de1.0slot.trade?api-key=335e371309b6492584368e9dc553622d")
         .json(&request_body)
         .send()
         .await;

@@ -1,12 +1,9 @@
-use std::time::{Duration};
-
 use crate::*;
 use colored::*;
 
-pub fn update_status_from_buy_event(
+pub fn update_status_from_pumpfun_buy_event(
     mut token_data: TokenDatabaseSchema,
-    buy_event: BuyEvent,
-    _is_bundler_buy: bool,
+    buy_event: PumpfunBuyEvent,
     tx_id: String,
 ) -> TokenDatabaseSchema {
     let updated_token_price = (buy_event.virtual_sol_reserves as f64 / 10f64.powi(9))
@@ -14,44 +11,30 @@ pub fn update_status_from_buy_event(
 
     token_data.token_max_price = token_data.token_max_price.max(updated_token_price);
     token_data.token_price = updated_token_price;
-    token_data.token_marketcap = updated_token_price * token_data.token_total_supply as f64;
+    token_data.token_creator = buy_event.creator;
 
     if buy_event.user == *SIGNER_PUBKEY {
         info!(
-            "[My Tx]\t[{}]\t*Hash: {}\t*mint: {}",
+            "[My Tx]\t[{}]\t*Hash: {}\t*Mint: {}",
             "Buy".green(),
             tx_id,
             buy_event.mint
         );
         token_data.token_is_purchased = true;
         token_data.token_balance += buy_event.token_amount;
-        token_data.token_average_buying_price = updated_token_price;
-
-        token_data.tp_selling_plan = TPSellingPlan {
-            tp_1: (*TAKE_PROFIT_1_PCNT * token_data.token_balance as f64) as u64,
-            tp_2: (*TAKE_PROFIT_2_PCNT * token_data.token_balance as f64) as u64,
-            tp_3: (*TAKE_PROFIT_3_PCNT * token_data.token_balance as f64) as u64,
-            tp_4: (*TAKE_PROFIT_4_PCNT * token_data.token_balance as f64) as u64,
-            tp_5: (*TAKE_PROFIT_5_PCNT * token_data.token_balance as f64) as u64,
-        };
+        token_data.token_buying_point_price = updated_token_price;
+        token_data.token_sell_status = TokenSellStatus::None;
+        token_data.initialize_sell_plan_if_needed();
     } else if buy_event.user == token_data.token_creator {
         if token_data.dev_buy_sol_lamports == None {
-            info!(
-                "[Dev Buy]\t*amount: {:.9} SOL*mint: {}",
-                buy_event.sol_amount as f64 / 10f64.powi(9),
-                buy_event.mint
-            );
             token_data.dev_buy_sol_lamports = Some(buy_event.sol_amount);
-            token_data.token_price_after_mint_bundler = updated_token_price;
+
+            //Manual pattern handler
+            if check_manul_entry_signal(token_data.clone()) {
+                token_data.token_trade_signal = TokenTradeSignal::IsEntryPoint;
+                token_data.set_tp_sell_strategy(vec![400.0], vec![100.0]);
+            }
         };
-    } else if token_data.token_mint_time.elapsed() < Duration::from_millis(40) {
-        //Token mint bundler transactions
-        info!(
-            "[Mint Bundler]\t*amount: {:.3} SOL*mint: {}",
-            buy_event.sol_amount as f64 / 10f64.powi(9),
-            buy_event.mint
-        );
-        token_data.token_price_after_mint_bundler = updated_token_price;
     }
 
     //update sell state flag
@@ -61,9 +44,9 @@ pub fn update_status_from_buy_event(
     token_data.clone()
 }
 
-pub fn update_status_from_sell_event(
+pub fn update_status_from_pumpfun_sell_event(
     mut token_data: TokenDatabaseSchema,
-    sell_event: SellEvent,
+    sell_event: PumpfunSellEvent,
     tx_id: String,
 ) -> Option<TokenDatabaseSchema> {
     let updated_token_price = (sell_event.virtual_sol_reserves as f64 / 10f64.powi(9))
@@ -71,23 +54,25 @@ pub fn update_status_from_sell_event(
 
     token_data.token_max_price = token_data.token_max_price.max(updated_token_price);
     token_data.token_price = updated_token_price;
-    token_data.token_marketcap = updated_token_price * token_data.token_total_supply as f64;
+    token_data.token_creator = sell_event.creator;
 
-    //update buy state flag
-    token_data.update_buy_state_flag();
     //update sell state flag
     token_data.update_sell_state_flag(tx_id.clone());
 
     if sell_event.user == *SIGNER_PUBKEY {
         info!(
-            "[My Tx]\t[{}]\t*Hash: {}\t*mint: {}",
+            "[My Tx]\t[{}]\t*Hash: {}\t*Mint: {}",
             "Sell".red(),
             tx_id,
             sell_event.mint.to_string()
         );
         token_data.token_balance -= sell_event.token_amount;
+        token_data.token_sell_status = TokenSellStatus::None;
+        token_data.pending_tp_sell_index = None;
+        token_data.pending_tp_sell_amount = 0;
 
         if token_data.token_balance > 0 {
+            token_data.next_tp_index_to_sell = token_data.next_tp_index_to_sell.saturating_add(1);
             let _ = TOKEN_DB.upsert(sell_event.mint.clone(), token_data.clone());
             Some(token_data.clone())
         } else {
@@ -96,6 +81,111 @@ pub fn update_status_from_sell_event(
         }
     } else {
         let _ = TOKEN_DB.upsert(sell_event.mint.clone(), token_data.clone());
+        Some(token_data.clone())
+    }
+}
+
+///Migration data handler
+
+pub fn update_status_from_migration_event(
+    mut token_data: TokenDatabaseSchema,
+    create_pool_accounts: CreatePoolInstructionAccounts,
+    create_pool_event_data: CreatePoolEventData,
+    tx_id: String,
+) -> TokenDatabaseSchema {
+    info!("[MIGRATED]: {}", token_data.token_mint);
+    let updated_token_price = (create_pool_event_data.quote_amount_in as f64 / 10f64.powi(9))
+        / (create_pool_event_data.base_amount_in as f64 / 10f64.powi(6));
+
+    token_data.token_price = updated_token_price;
+    token_data.token_max_price = token_data.token_max_price.max(updated_token_price);
+    token_data.token_is_migrated = true;
+    token_data.token_creator = create_pool_event_data.coin_creator;
+
+    token_data.pumpswap_struct = Some(PumpSwapStruct::from_migrate(
+        &create_pool_accounts,
+        create_pool_event_data,
+    ));
+
+    token_data.update_sell_state_flag(tx_id.clone());
+
+    let _ = TOKEN_DB.upsert(token_data.token_mint.clone(), token_data.clone());
+    token_data
+}
+
+////Pumpswap trade data handler
+pub fn update_status_from_pumpswap_buy_event(
+    mut token_data: TokenDatabaseSchema,
+    buy_event: PumpswapBuyEvent,
+    buy_accounts: PumpswapBuyInstructionAccounts,
+    tx_id: String,
+) -> TokenDatabaseSchema {
+    let updated_token_price = (buy_event.pool_quote_token_reserves as f64 / 10f64.powi(9))
+        / (buy_event.pool_base_token_reserves as f64 / 10f64.powi(6));
+
+    token_data.token_max_price = token_data.token_max_price.max(updated_token_price);
+
+    token_data.token_creator = buy_event.coin_creator;
+    token_data.token_price = updated_token_price;
+
+    token_data.update_sell_state_flag(tx_id.clone());
+
+    if buy_event.user == *SIGNER_PUBKEY {
+        info!(
+            "[My tx]\t[{}]\t*Hash: {}\t*mint: {}",
+            "Buy".green(),
+            tx_id,
+            buy_accounts.base_mint.to_string()
+        );
+
+        token_data.token_is_purchased = true;
+        token_data.token_buying_point_price = updated_token_price;
+        token_data.token_balance += buy_event.base_amount_out;
+        token_data.token_sell_status = TokenSellStatus::None;
+        token_data.initialize_sell_plan_if_needed();
+    }
+
+    let _ = TOKEN_DB.upsert(token_data.token_mint.clone(), token_data.clone());
+    token_data
+}
+
+pub fn update_status_from_pumpswap_sell_event(
+    mut token_data: TokenDatabaseSchema,
+    sell_event: PumpswapSellEvent,
+    sell_accounts: PumpswapSellInstructionAccounts,
+    tx_id: String,
+) -> Option<TokenDatabaseSchema> {
+    let updated_token_price = (sell_event.pool_quote_token_reserves as f64 / 10f64.powi(9))
+        / (sell_event.pool_base_token_reserves as f64 / 10f64.powi(6));
+
+    token_data.token_creator = sell_event.coin_creator;
+    token_data.token_price = updated_token_price;
+
+    token_data.update_sell_state_flag(tx_id.clone());
+
+    if sell_event.user == *SIGNER_PUBKEY {
+        info!(
+            "[My Tx]\t[{}]\t*Hash: {}\t*mint: {}",
+            "Sell".red(),
+            tx_id,
+            sell_accounts.base_mint.to_string()
+        );
+
+        token_data.token_balance -= sell_event.base_amount_in;
+        token_data.token_sell_status = TokenSellStatus::None;
+        token_data.pending_tp_sell_index = None;
+        token_data.pending_tp_sell_amount = 0;
+
+        if token_data.token_balance > 0 {
+            token_data.next_tp_index_to_sell = token_data.next_tp_index_to_sell.saturating_add(1);
+            let _ = TOKEN_DB.upsert(sell_accounts.base_mint.clone(), token_data.clone());
+            Some(token_data.clone())
+        } else {
+            let _ = TOKEN_DB.delete(sell_accounts.base_mint.clone());
+            None
+        }
+    } else {
+        let _ = TOKEN_DB.upsert(sell_accounts.base_mint.clone(), token_data.clone());
         Some(token_data.clone())
     }
 }

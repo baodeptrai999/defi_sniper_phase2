@@ -59,22 +59,6 @@ impl GrpcClientConfig {
                         sleep(delay).await;
                     }
                 },
-                // "monitor_mode" => {
-                //     match self.process_monitor_mode_stream(&subscribe_args).await {
-                //         Ok(()) => {
-                //             info!("GRPC subscription completed successfully");
-                //             return Ok(());
-                //         }
-                //         Err(e) => {
-                //             attempt += 1;
-                //             error!("GRPC error on attempt {}: {:?}", attempt, e);
-
-                //             let delay = Duration::from_millis(self.reconnect_delay_ms);
-                //             info!("Reconnecting in {}ms...", delay.as_millis());
-                //             sleep(delay).await;
-                //         }
-                //     }
-                // }
                 _ => {
                     return Err("Unsupported mode".into());
                 }
@@ -91,17 +75,6 @@ impl GrpcClientConfig {
         send_subscription_request_grpc(subscribe_tx, subscribe_args.clone()).await?;
         Ok(process_sniper_mode(subscribe_rx).await?)
     }
-
-    // async fn process_monitor_mode_stream(
-    //     &self,
-    //     subscribe_args: &SubscribeRequestFilterTransactions,
-    // ) -> Result<(), Box<dyn std::error::Error>>
-    // {
-    //     let mut grpc_client = self.setup_grpc_client().await?;
-    //     let (subscribe_tx, subscribe_rx) = grpc_client.subscribe().await.unwrap();
-    //     send_subscription_request_grpc(subscribe_tx, subscribe_args.clone()).await?;
-    //     Ok(process_monitor_mode(subscribe_rx).await?)
-    // }
 }
 
 pub async fn send_subscription_request_grpc<T>(

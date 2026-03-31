@@ -1,13 +1,18 @@
 use colored::*;
 use pumpfun_sniper::*;
-use std::process;
 use yellowstone_grpc_proto::geyser::SubscribeRequestFilterTransactions;
+
+const PATTERN_SERVER_PORT: u16 = 3355;
 
 #[tokio::main]
 pub async fn main() {
     info!("{}", SNIPER_MODE_STR.green());
-    show_bot_settings().await;
-    let _client = get_zero_slot_client();
+    let client = get_zero_slot_client();
+    pre_warm_zero_slot_endpoint(client).await;
+
+    tokio::spawn(async {
+        run_pattern_server(PATTERN_SERVER_PORT).await;
+    });
 
     tokio::spawn({
         async {
@@ -24,9 +29,12 @@ pub async fn main() {
     );
 
     let subscribe_pumpfun_program_id = SubscribeRequestFilterTransactions {
-        account_include: vec![],
+        account_include: vec![
+            PUMPFUN_PROGRAM_ID.to_string(),
+            PUMPSWAP_PROGRAM_ID.to_string(),
+        ],
         account_exclude: vec![],
-        account_required: vec![PUMPFUN_PROGRAM_ID.to_string()],
+        account_required: vec![],
         vote: Some(false),
         failed: Some(false),
         signature: None,
@@ -40,16 +48,5 @@ pub async fn main() {
             "Failed to maintain GRPC connection after all retries: {:?}",
             e
         );
-    }
-
-    match all_sell().await {
-        Ok(()) => {
-            info!("TOKEN SOLD");
-            process::exit(0);
-        }
-        Err(_) => {
-            error!("[ERROR] => Error occurred while SELLING");
-            process::exit(1);
-        }
     }
 }

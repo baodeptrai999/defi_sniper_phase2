@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+axum = { version = "0.8", features = ["json"] }
 borsh = "1.5.7"
 chrono = "0.4.42"
 colored = "3.0.0"
@@ -42,8 +43,3 @@ csv = "1.4.0"
 [[bin]]
 name = "sniper_mode"
 path = "src/entry_point/sniper_mode.rs"
-
-[[bin]]
-name = "monitor_mode"
-path = "src/entry_point/monitor_mode.rs"                        
-
