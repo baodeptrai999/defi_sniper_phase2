@@ -25,7 +25,7 @@ pub async fn make_sniper_tx(trade_token_data_map: &HashMap<Pubkey, TokenDatabase
 
                 token_data.token_trade_signal = TokenTradeSignal::EntrySubmitted;
 
-                let tag = format!("[BUY]\t*MINT: {}", token_data.token_mint);
+                let tag = format!("[BUY] MINT: {}", token_data.token_mint);
 
                 let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
 
@@ -88,18 +88,13 @@ pub async fn make_sniper_tx(trade_token_data_map: &HashMap<Pubkey, TokenDatabase
                 let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
 
                 let tag = format!(
-                    "[SELL]\t*SL triggered\t*MINT: {}\t*MC: {}\t*AMOUNT: {}",
+                    "[SELL] SL triggered | MINT: {} | MC: {:.2} | AMT: {}",
                     token_data.token_mint,
                     token_data.token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
                     token_data.token_balance,
                 );
 
-                info!(
-                    "[SELL]\t*SL triggered\t*MINT: {}\t*MC: {}\t*AMOUNT: {}",
-                    token_data.token_mint,
-                    token_data.token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
-                    token_data.token_balance,
-                );
+                info!("{}", tag);
 
                 (ConfirmType::Sell(token_data.token_balance), ix, tag)
             }
@@ -132,20 +127,14 @@ pub async fn make_sniper_tx(trade_token_data_map: &HashMap<Pubkey, TokenDatabase
                 let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
 
                 let tag = format!(
-                    "[SELL]\t*TP{} triggered\t*MINT: {}\t*MC: {}\t*AMOUNT: {}",
+                    "[SELL] TP{} triggered | MINT: {} | MC: {:.2} | AMT: {}",
                     tp_idx + 1,
                     token_data.token_mint,
                     token_data.token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
                     sell_amount,
                 );
 
-                info!(
-                    "[SELL]\t*TP{} triggered\t*MINT: {}\t*MC: {}\t*AMOUNT: {}",
-                    tp_idx + 1,
-                    token_data.token_mint,
-                    token_data.token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
-                    sell_amount,
-                );
+                info!("{}", tag);
 
                 (ConfirmType::Sell(sell_amount), ix, tag)
             } else {
@@ -165,20 +154,14 @@ pub async fn make_sniper_tx(trade_token_data_map: &HashMap<Pubkey, TokenDatabase
                 let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
 
                 let tag = format!(
-                    "[SELL]\t*TP{} triggered\t*MINT: {}\t*MC: {}\t*AMOUNT: {}",
+                    "[SELL] TP{} triggered | MINT: {} | MC: {:.2} | AMT: {}",
                     tp_idx + 1,
                     token_data.token_mint,
                     token_data.token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
                     sell_amount,
                 );
 
-                info!(
-                    "[SELL]\t*TP{} triggered\t*MINT: {}\t*MC: {}\t*AMOUNT: {}",
-                    tp_idx + 1,
-                    token_data.token_mint,
-                    token_data.token_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
-                    sell_amount,
-                );
+                info!("{}", tag);
 
                 (ConfirmType::Sell(sell_amount), ix, tag)
             }

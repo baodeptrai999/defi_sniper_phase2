@@ -1,17 +1,16 @@
 #[macro_export]
 macro_rules! log {
   ($($arg:tt)*) => {{
+    use colored::Colorize;
     let now = chrono::Local::now();
-    let formatted_time = now.format("%Y-%m-%d %H:%M:%S").to_string();
-    let millis = format!("{:03}", now.timestamp_subsec_millis());
-    let micros = format!("{:03}", now.timestamp_subsec_micros() % 1000);
+    let ts = now.format("%H:%M:%S").to_string();
+    let ms = format!("{:03}", now.timestamp_subsec_millis());
 
-    let timestamp = format!("{}.{} {}", formatted_time, millis, micros);
-    let tab_prefix = std::iter::repeat("\t").take($crate::LOG_LEVEL as usize).collect::<String>();
     let msg = format!($($arg)*);
-    let file_msg = format!("{} {} {}{}", timestamp, $crate::LOG_LEVEL_STR, tab_prefix, msg);
+    let terminal_msg = format!("{}.{} {} {}", ts.dimmed(), ms.dimmed(), "LOG".white().dimmed(), msg);
+    let file_msg = format!("{}.{} [LOG] {}", ts, ms, msg);
 
-    println!("{}", file_msg);
+    println!("{}", terminal_msg);
     $crate::log_to_file(&file_msg);
   }}
 }
@@ -19,17 +18,16 @@ macro_rules! log {
 #[macro_export]
 macro_rules! info {
   ($($arg:tt)*) => {{
+    use colored::Colorize;
     let now = chrono::Local::now();
-    let formatted_time = now.format("%Y-%m-%d %H:%M:%S").to_string();
-    let millis = format!("{:03}", now.timestamp_subsec_millis());
-    let micros = format!("{:03}", now.timestamp_subsec_micros() % 1000);
+    let ts = now.format("%H:%M:%S").to_string();
+    let ms = format!("{:03}", now.timestamp_subsec_millis());
 
-    let timestamp = format!("{}.{} {}", formatted_time, millis, micros);
-    let tab_prefix = std::iter::repeat("\t").take($crate::INFO_LEVEL as usize).collect::<String>();
     let msg = format!($($arg)*);
-    let file_msg = format!("{} {} {}{}", timestamp, $crate::INFO_LEVEL_STR, tab_prefix, msg);
+    let terminal_msg = format!("{}.{} {} {}", ts.dimmed(), ms.dimmed(), "INFO".cyan().bold(), msg);
+    let file_msg = format!("{}.{} [INFO] {}", ts, ms, msg);
 
-    println!("{}", file_msg);
+    println!("{}", terminal_msg);
     $crate::log_to_file(&file_msg);
   }}
 }
@@ -37,17 +35,16 @@ macro_rules! info {
 #[macro_export]
 macro_rules! success {
   ($($arg:tt)*) => {{
+    use colored::Colorize;
     let now = chrono::Local::now();
-    let formatted_time = now.format("%Y-%m-%d %H:%M:%S").to_string();
-    let millis = format!("{:03}", now.timestamp_subsec_millis());
-    let micros = format!("{:03}", now.timestamp_subsec_micros() % 1000);
+    let ts = now.format("%H:%M:%S").to_string();
+    let ms = format!("{:03}", now.timestamp_subsec_millis());
 
-    let timestamp = format!("{}.{} {}", formatted_time, millis, micros);
-    let tab_prefix = std::iter::repeat("\t").take($crate::SUCCESS_LEVEL as usize).collect::<String>();
     let msg = format!($($arg)*);
-    let file_msg = format!("{} {} {}{}", timestamp, SUCCESS_LEVEL_STR, tab_prefix, msg);
+    let terminal_msg = format!("{}.{} {} {}", ts.dimmed(), ms.dimmed(), "  OK".green().bold(), msg.green());
+    let file_msg = format!("{}.{} [OK] {}", ts, ms, msg);
 
-    println!("{}", file_msg);
+    println!("{}", terminal_msg);
     $crate::log_to_file(&file_msg);
   }}
 }
@@ -55,17 +52,16 @@ macro_rules! success {
 #[macro_export]
 macro_rules! warning {
   ($($arg:tt)*) => {{
+    use colored::Colorize;
     let now = chrono::Local::now();
-    let formatted_time = now.format("%Y-%m-%d %H:%M:%S").to_string();
-    let millis = format!("{:03}", now.timestamp_subsec_millis());
-    let micros = format!("{:03}", now.timestamp_subsec_micros() % 1000);
+    let ts = now.format("%H:%M:%S").to_string();
+    let ms = format!("{:03}", now.timestamp_subsec_millis());
 
-    let timestamp = format!("{}.{} {}", formatted_time, millis, micros);
-    let tab_prefix = std::iter::repeat("\t").take($crate::WARNING_LEVEL as usize).collect::<String>();
     let msg = format!($($arg)*);
-    let file_msg = format!("{} {} {}{}", timestamp, WARNING_LEVEL_STR, tab_prefix, msg);
+    let terminal_msg = format!("{}.{} {} {}", ts.dimmed(), ms.dimmed(), "WARN".yellow().bold(), msg.yellow());
+    let file_msg = format!("{}.{} [WARN] {}", ts, ms, msg);
 
-    println!("{}", file_msg);
+    println!("{}", terminal_msg);
     $crate::log_to_file(&file_msg);
   }}
 }
@@ -73,17 +69,16 @@ macro_rules! warning {
 #[macro_export]
 macro_rules! error {
   ($($arg:tt)*) => {{
+    use colored::Colorize;
     let now = chrono::Local::now();
-    let formatted_time = now.format("%Y-%m-%d %H:%M:%S").to_string();
-    let millis = format!("{:03}", now.timestamp_subsec_millis());
-    let micros = format!("{:03}", now.timestamp_subsec_micros() % 1000);
+    let ts = now.format("%H:%M:%S").to_string();
+    let ms = format!("{:03}", now.timestamp_subsec_millis());
 
-    let timestamp = format!("{}.{} {}", formatted_time, millis, micros);
-    let tab_prefix = std::iter::repeat("\t").take($crate::ERROR_LEVEL as usize).collect::<String>();
     let msg = format!($($arg)*);
-    let file_msg = format!("{} {} {}{}", timestamp, ERROR_LEVEL_STR, tab_prefix, msg);
+    let terminal_msg = format!("{}.{} {} {}", ts.dimmed(), ms.dimmed(), " ERR".red().bold(), msg.red());
+    let file_msg = format!("{}.{} [ERR] {}", ts, ms, msg);
 
-    println!("{}", file_msg);
+    println!("{}", terminal_msg);
     $crate::log_to_file(&file_msg);
   }}
 }

@@ -71,10 +71,8 @@ pub fn confirm_sell_with_retry(
 
             if attempt < max_attempts {
                 alert!(
-                    "[SELL_RETRY]\n\t*Mint: {}\n\t*Attempt: {}/{}\n\t*Reason: tx failed or not confirmed, rebuilding sell route",
-                    mint,
-                    attempt,
-                    max_attempts,
+                    "[SELL_RETRY] Attempt {}/{} | Mint: {} | rebuilding",
+                    attempt, max_attempts, mint
                 );
 
                 sleep(Duration::from_millis(600)).await;
@@ -125,7 +123,7 @@ fn build_retry_sell_instructions(
         ix.push(close_ix);
 
         let tag = format!(
-            "[SELL_RETRY]\t*ROUTE: PUMPSWAP\t*MINT: {}\t*AMOUNT: {}",
+            "[SELL_RETRY] PUMPSWAP | MINT: {} | AMT: {}",
             mint, amount
         );
 
@@ -145,7 +143,7 @@ fn build_retry_sell_instructions(
     }
 
     let tag = format!(
-        "[SELL_RETRY]\t*ROUTE: PUMPFUN\t*MINT: {}\t*AMOUNT: {}",
+        "[SELL_RETRY] PUMPFUN | MINT: {} | AMT: {}",
         mint, amount
     );
     Some((ix, tag))
@@ -160,22 +158,12 @@ fn reset_sell_submission_state(mint: Pubkey) {
 }
 
 pub async fn wait_for_confirmation(signature_str: &str, tag: String) -> Option<Signature> {
-    let trimed_clean_sig = signature_str
-        .trim()
-        .replace("\"", "")
-        .replace("'", "")
-        .replace("\n", "")
-        .replace("\r", "");
-    let signature = match trimed_clean_sig.parse::<Signature>() {
+    let signature = match signature_str.trim().parse::<Signature>() {
         Ok(sig) => sig,
         Err(_) => {
             error!(
-                "[FORCE_CHECK]
-                \t* Check : {}
-                \t* {}
-                \t* States : Invalid signature",
-                solscan!(signature_str),
-                tag.clone()
+                "[CONFIRM] Invalid signature: {} | {}",
+                signature_str, tag
             );
 
             return None;
@@ -190,21 +178,16 @@ pub async fn wait_for_confirmation(signature_str: &str, tag: String) -> Option<S
                 if let Some(Some(status)) = statuses.value.get(0) {
                     if status.err.is_some() {
                         error!(
-                            "[FORCE_CHECK]\n\t* Check : {}\n\t* States : Confirmed but failed on-chain\n\t* {}",
-                            solscan!(signature),
-                            tag
+                            "[CONFIRM] Failed on-chain | {} | {}",
+                            solscan!(signature), tag
                         );
                         return None;
                     }
 
                     if status.confirmations.is_none() || status.confirmations.unwrap_or(0) > 0 {
                         success!(
-                            "[FORCE_CHECK]
-                            \t* Check : {}
-                            \t* States : Confirmed
-                            \t* {}",
-                            solscan!(signature),
-                            tag
+                            "[CONFIRM] Confirmed | {} | {}",
+                            solscan!(signature), tag
                         );
                         return Some(signature);
                     }
@@ -216,12 +199,8 @@ pub async fn wait_for_confirmation(signature_str: &str, tag: String) -> Option<S
         attempts += 1;
         if attempts >= 10 {
             error!(
-                "[FORCE_CHECK]
-                \t* Check : https://solscan.io/tx/{}
-                \t* States : Failed
-                \t* {}",
-                signature,
-                tag.clone()
+                "[CONFIRM] Timed out | {} | {}",
+                solscan!(signature), tag
             );
             return None;
         }

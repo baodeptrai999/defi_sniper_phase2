@@ -16,7 +16,7 @@ pub async fn send_zero_slot_transaction(
     let nonce = match acquire_nonce() {
         Some(n) => n,
         None => {
-            error!("[ZERO_SLOT] No nonce account available\n\t* {}", tag);
+            error!("[ZERO_SLOT] No nonce available | {}", tag);
             return None;
         }
     };
@@ -76,30 +76,23 @@ pub async fn send_zero_slot_transaction(
             spawn_nonce_refresh(nonce.index);
 
             let response_json: serde_json::Value = response_data.json().await.unwrap();
-            if let Some(result) = response_json.get("result") {
-                println!(
-                    "Transaction(zero slot) submission took: {:?}",
-                    tx_submission_start.elapsed()
-                );
+            if let Some(result) = response_json.get("result").and_then(|v| v.as_str()) {
                 info!(
-                    "[SUBMIT]
-                        \t* Service: ZERO_SLOT
-                        \t* Hash: {:?}
-                        \t* {}",
+                    "[SUBMIT] ZERO_SLOT | {} | took {:?} | {}",
                     result,
+                    tx_submission_start.elapsed(),
                     tag.clone()
                 );
                 return Some(result.to_string());
             } else {
-                println!("No response from confirm service");
-                println!("{:?}", response_json);
+                error!("[SUBMIT] ZERO_SLOT | no result | {:?}", response_json);
                 return None;
             }
         }
         Err(e) => {
             // HTTP error — tx was never sent, nonce not consumed
             release_nonce(nonce.index);
-            println!("Response error: {}", e);
+            error!("[SUBMIT] ZERO_SLOT | HTTP error: {}", e);
             return None;
         }
     }

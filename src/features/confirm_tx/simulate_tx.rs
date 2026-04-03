@@ -30,9 +30,8 @@ pub async fn simulate_and_send_sell_tx(
         Ok(response) => {
             if let Some(ref err) = response.value.err {
                 error!(
-                    "[SIMULATE]\n\t* Simulation failed: {:?}\n\t* Falling back to default CU\n\t* {}",
-                    err,
-                    tag.clone()
+                    "[SIMULATE] Failed: {:?} | fallback CU {} | {}",
+                    err, DEFAULT_SELL_CU_LIMIT, tag.clone()
                 );
                 DEFAULT_SELL_CU_LIMIT
             } else {
@@ -45,9 +44,8 @@ pub async fn simulate_and_send_sell_tx(
         }
         Err(e) => {
             error!(
-                "[SIMULATE]\n\t* RPC simulation error: {:?}\n\t* Falling back to default CU\n\t* {}",
-                e,
-                tag.clone()
+                "[SIMULATE] RPC error: {:?} | fallback CU {} | {}",
+                e, DEFAULT_SELL_CU_LIMIT, tag.clone()
             );
             DEFAULT_SELL_CU_LIMIT
         }
@@ -57,7 +55,7 @@ pub async fn simulate_and_send_sell_tx(
     let nonce = match acquire_nonce() {
         Some(n) => n,
         None => {
-            error!("[SELL] No nonce account available\n\t* {}", tag);
+            error!("[SELL] No nonce available | {}", tag);
             return None;
         }
     };
@@ -92,20 +90,16 @@ pub async fn simulate_and_send_sell_tx(
         Ok(signature) => {
             // TX was submitted — nonce will be consumed on-chain
             spawn_nonce_refresh(nonce.index);
-            println!(
-                "Transaction(sell RPC) submission took: {:?}",
-                tx_submission_start.elapsed()
-            );
             info!(
-                "[SUBMIT]\n\t* Service: RPC\n\t* Hash: {:?}\n\t* CU: {}\n\t* {}",
-                signature, cu_limit, tag
+                "[SUBMIT] RPC SELL | {} | CU {} | took {:?} | {}",
+                signature, cu_limit, tx_submission_start.elapsed(), tag
             );
             Some(signature.to_string())
         }
         Err(e) => {
             // RPC error — tx was never sent, nonce not consumed
             release_nonce(nonce.index);
-            error!("[SUBMIT]\n\t* RPC send error: {:?}\n\t* {}", e, tag);
+            error!("[SUBMIT] RPC SELL | send error: {:?} | {}", e, tag);
             None
         }
     };

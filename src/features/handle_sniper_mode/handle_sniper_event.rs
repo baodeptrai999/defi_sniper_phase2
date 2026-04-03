@@ -138,7 +138,7 @@ pub async fn handle_trade_events(
 
                 if *history == pattern.buy_pattern {
                     info!(
-                        "[BUNDLE_MATCH]\n\t*MINT: {}\n\t*type: exact\n\t*pattern_len: {}",
+                        "[BUNDLE_MATCH] MINT: {} | exact | len: {}",
                         mint,
                         pattern.buy_pattern.len(),
                     );
@@ -157,7 +157,7 @@ pub async fn handle_trade_events(
                 match token_data.token_trade_signal {
                     TokenTradeSignal::None => {
                         info!(
-                            "🎯 Buy pattern matched!\n\t*MINT: {}\n\t*mint_pattern: {:?}\n\t*buy_pattern: {:?}\n\t*agent_tp_thresholds: {:?}%\n\t*real_tp_threshold(primary): {:?}%\n\t*sell_amounts: {:?}%\n\t*net_profit: {:.4}\n\t*token_count: {}\n\t*avg_profit: {:.4}\n\t*win_rate_low: {}\n\t*W/L: {}/{}\n\t*win_rate: {:.2}%",
+                            "🎯 [MATCH] MINT: {} | pattern: {:?} {:?} | TP: {:?}% (real: {:?}%) | sell: {:?}% | profit: {:.4} | n: {} | avg: {:.4} | WR_low: {} | W/L: {}/{} | WR: {:.2}%",
                             mint,
                             pattern.mint_pattern,
                             pattern.buy_pattern,
@@ -176,7 +176,7 @@ pub async fn handle_trade_events(
                     }
                     TokenTradeSignal::EntrySubmitted => {
                         info!(
-                            "🔄 Longer pattern matched, updating TP\n\t*MINT: {}\n\t*buy_pattern: {:?}\n\t*new agent tp_thresholds: {:?}%\n\t*new real tp_threshold(primary): {:?}%",
+                            "🔄 [TP_UPDATE] MINT: {} | pattern: {:?} | new TP: {:?}% (real: {:?}%)",
                             mint,
                             pattern.buy_pattern,
                             pattern.tp_threshold,

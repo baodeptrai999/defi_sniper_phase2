@@ -139,7 +139,7 @@ pub async fn init_nonce_pool() {
     }
 
     println!(
-        "  {} Loading {} nonce accounts...",
+        "{} Loading {} nonce accounts...",
         "⏳".yellow(),
         pubkeys.len()
     );
@@ -162,7 +162,7 @@ pub async fn init_nonce_pool() {
         .filter(|e| *e.nonce_hash.lock().unwrap() != Hash::default())
         .count();
     println!(
-        "  {} Nonce pool ready: {}/{} accounts loaded",
+        "{} Nonce pool ready: {}/{} accounts loaded",
         "✅".green(),
         valid,
         entries.len()
