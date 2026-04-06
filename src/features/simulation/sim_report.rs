@@ -9,7 +9,7 @@ pub fn generate_report(engine: &SimEngine) -> String {
     let pattern_counts = engine.get_pattern_counts();
     let total_tx = engine.get_total_tx();
     let elapsed = engine.get_elapsed();
-    let active = engine.get_active_count();
+
 
     let now = Local::now();
     let date_str = now.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -98,9 +98,16 @@ pub fn generate_report(engine: &SimEngine) -> String {
     report.push_str(&format!("  Total Matched:        {}\n", results.len()));
     report.push_str(&format!("  Total Bought:         {}\n", total_bought));
     report.push_str(&format!("  Not Confirmed:        {}\n", unbought.len()));
+
+    let holding_count = bought_tokens.iter().filter(|t| t.outcome == SimOutcome::Timeout).count();
+    let tp_count_all = bought_tokens.iter().filter(|t| t.outcome == SimOutcome::TpHit).count();
+    let sl_count_all = bought_tokens.iter().filter(|t| t.outcome == SimOutcome::SlHit).count();
+    let partial_count_all = bought_tokens.iter().filter(|t| t.outcome == SimOutcome::Partial).count();
+
     report.push_str(&format!("  Wins:                 {}\n", win_count));
     report.push_str(&format!("  Losses:               {}\n", loss_count));
-    report.push_str(&format!("  Win Rate:             {:.2}%\n\n", win_rate));
+    report.push_str(&format!("  Win Rate:             {:.2}%\n", win_rate));
+    report.push_str(&format!("  Outcomes:             TP: {} | SL: {} | Partial: {} | Holding: {}\n\n", tp_count_all, sl_count_all, partial_count_all, holding_count));
 
     report.push_str(&format!("  Total Invested:       {:.6} SOL\n", total_invested));
     report.push_str(&format!("  Total Returned:       {:.6} SOL\n", total_returned));
