@@ -58,7 +58,7 @@ impl std::fmt::Display for SimOutcome {
             SimOutcome::Pending => write!(f, "PENDING"),
             SimOutcome::TpHit => write!(f, "TP_HIT"),
             SimOutcome::SlHit => write!(f, "SL_HIT"),
-            SimOutcome::Timeout => write!(f, "TIMEOUT"),
+            SimOutcome::Timeout => write!(f, "HOLDING"),
             SimOutcome::Partial => write!(f, "PARTIAL"),
         }
     }
@@ -191,13 +191,12 @@ impl SimEngine {
                      │  Pattern:    {}\n\
                      │  Mint:       {}\n\
                      │  CU:         ({}, {})\n\
-                     │  Price:      {:.10}\n\
                      │  MC:         {:.2} SOL\n\
                      │  TP Levels:  {:?}%\n\
                      │  Sell Amts:  {:?}%\n\
                      └──────────────────────",
                     manual_pat.label, mint, unit, price,
-                    initial_price, mc,
+                    mc,
                     manual_pat.take_profit, manual_pat.sell_amounts,
                 );
             } else if server_matched {
@@ -240,11 +239,10 @@ impl SimEngine {
                     "\n🔍 [SIM] [SERVER_MINT_MATCH]\n\
                      │  Mint:       {}\n\
                      │  CU:         ({}, {})\n\
-                     │  Price:      {:.10}\n\
                      │  MC:         {:.2} SOL\n\
                      │  Status:     Waiting for bundle buy match...\n\
                      └──────────────────────",
-                    mint, unit, price, initial_price, mc,
+                    mint, unit, price, mc,
                 );
             }
         }
@@ -282,21 +280,21 @@ impl SimEngine {
                     sim.buy_confirmed = true;
                     sim.buy_price = new_price;
                     let mc = new_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
+                    let mint_mc = sim.mint_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                     let price_change = ((new_price / sim.mint_price) - 1.0) * 100.0;
                     info!(
                         "\n💰 [SIM] [BUY]\n\
                          │  Pattern:    {}\n\
                          │  Mint:       {}\n\
-                         │  Buy Price:  {:.10}\n\
-                         │  Mint Price: {:.10}\n\
-                         │  Δ Price:    {:+.2}%\n\
-                         │  MC:         {:.2} SOL\n\
+                         │  Buy MC:     {:.2} SOL\n\
+                         │  Mint MC:    {:.2} SOL\n\
+                         │  Δ MC:       {:+.2}%\n\
                          │  Amount:     {:.4} SOL\n\
                          │  SL:         {:.0}%\n\
                          │  TP:         {:?}%\n\
                          └──────────────────────",
                         sim.pattern_label, sim.mint,
-                        new_price, sim.mint_price, price_change, mc,
+                        mc, mint_mc, price_change,
                         self.buy_amount_sol,
                         self.stop_loss_pct * 100.0,
                         sim.tp_levels,
@@ -345,7 +343,6 @@ impl SimEngine {
                          │  Mint:       {}\n\
                          │  Mint CU:    ({}, {})\n\
                          │  Buy Bundle: {:?}\n\
-                         │  Price:      {:.10}\n\
                          │  MC:         {:.2} SOL\n\
                          │  TP Levels:  {:?}%\n\
                          │  Sell Amts:  {:?}%\n\
@@ -353,7 +350,7 @@ impl SimEngine {
                         sim.pattern_label, mint,
                         mint_pat.0, mint_pat.1,
                         pattern.buy_pattern,
-                        sim.current_price, mc,
+                        mc,
                         sim.tp_levels, sim.sell_amounts,
                     );
                 }
@@ -385,11 +382,9 @@ impl SimEngine {
                     "\n🔄 [SIM] [MIGRATED]\n\
                      │  Pattern:  {}\n\
                      │  Mint:     {}\n\
-                     │  Price:    {:.10}\n\
                      │  MC:       {:.2} SOL\n\
                      └──────────────────────",
                     sim.pattern_label, sim.mint,
-                    sim.current_price,
                     sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
                 );
             }
@@ -417,13 +412,12 @@ impl SimEngine {
                         "\n💰 [SIM] [BUY] (Pumpswap)\n\
                          │  Pattern:    {}\n\
                          │  Mint:       {}\n\
-                         │  Buy Price:  {:.10}\n\
-                         │  Δ Price:    {:+.2}%\n\
-                         │  MC:         {:.2} SOL\n\
+                         │  Buy MC:     {:.2} SOL\n\
+                         │  Δ MC:       {:+.2}%\n\
                          │  Amount:     {:.4} SOL\n\
                          └──────────────────────",
                         sim.pattern_label, sim.mint,
-                        new_price, price_change, mc,
+                        mc, price_change,
                         self.buy_amount_sol,
                     );
                 }
@@ -492,26 +486,26 @@ impl SimEngine {
                 SimOutcome::SlHit
             };
             sim.exit_reason = format!(
-                "SL at {:.10} (buy: {:.10}, loss: {:.2}%)",
-                sim.current_price,
-                sim.buy_price,
+                "SL at MC {:.2} (buy MC: {:.2}, loss: {:.2}%)",
+                sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
+                sim.buy_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64,
                 sim.pnl_pct
             );
 
             let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
+            let buy_mc = sim.buy_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
             let sol_pnl = self.buy_amount_sol * sim.pnl_pct / 100.0;
             info!(
                 "\n🔴 [SIM] [SELL] [SL]\n\
                  │  Pattern:    {}\n\
                  │  Mint:       {}\n\
-                 │  Buy Price:  {:.10}\n\
-                 │  Sell Price: {:.10}\n\
-                 │  MC:         {:.2} SOL\n\
+                 │  Buy MC:     {:.2} SOL\n\
+                 │  Sell MC:    {:.2} SOL\n\
                  │  PnL:        {:.2}% ({:+.6} SOL)\n\
                  │  Sold Prior: {:.0}%\n\
                  └──────────────────────",
                 sim.pattern_label, sim.mint,
-                sim.buy_price, sim.current_price, mc,
+                buy_mc, mc,
                 sim.pnl_pct, sol_pnl,
                 sim.total_sold_pct,
             );
@@ -530,6 +524,7 @@ impl SimEngine {
                 sim.next_tp_index += 1;
 
                 let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
+                let buy_mc = sim.buy_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                 let price_mult = sim.current_price / sim.buy_price;
                 let this_tp_pnl_pct = (price_mult - 1.0) * 100.0;
                 let this_tp_sol = self.buy_amount_sol * (sell_pct / 100.0) * price_mult;
@@ -537,17 +532,15 @@ impl SimEngine {
                     "\n🟢 [SIM] [SELL] [TP{}]\n\
                      │  Pattern:    {}\n\
                      │  Mint:       {}\n\
-                     │  Buy Price:  {:.10}\n\
-                     │  Sell Price: {:.10}  ({:.2}x)\n\
-                     │  MC:         {:.2} SOL\n\
+                     │  Buy MC:     {:.2} SOL\n\
+                     │  Sell MC:    {:.2} SOL  ({:.2}x)\n\
                      │  This TP:    {:.0}% sold → {:.6} SOL return\n\
                      │  Price PnL:  {:+.2}%\n\
                      │  Total Sold: {:.0}%\n\
                      └──────────────────────",
                     sim.next_tp_index,
                     sim.pattern_label, sim.mint,
-                    sim.buy_price, sim.current_price, price_mult,
-                    mc,
+                    buy_mc, mc, price_mult,
                     sell_pct, this_tp_sol,
                     this_tp_pnl_pct,
                     sim.total_sold_pct,
@@ -565,8 +558,8 @@ impl SimEngine {
                     sim.pnl_pct = pnl / 100.0 * 100.0;
                     sim.outcome = SimOutcome::TpHit;
                     sim.exit_reason = format!(
-                        "All TPs hit | final: {:.10} | PnL: {:.2}%",
-                        sim.current_price, sim.pnl_pct
+                        "All TPs hit | final MC: {:.2} SOL | PnL: {:.2}%",
+                        sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64, sim.pnl_pct
                     );
 
                     let sol_pnl = self.buy_amount_sol * sim.pnl_pct / 100.0;
@@ -605,8 +598,8 @@ impl SimEngine {
                     sim.pnl_pct = (pnl_from_sold + pnl_from_remaining) / 100.0 * 100.0;
                     sim.outcome = SimOutcome::Timeout;
                     sim.exit_reason = format!(
-                        "Timeout | last: {:.10} | PnL: {:.2}%",
-                        sim.current_price, sim.pnl_pct
+                        "Holding | last MC: {:.2} SOL | PnL: {:.2}%",
+                        sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64, sim.pnl_pct
                     );
                 } else {
                     sim.outcome = SimOutcome::Timeout;

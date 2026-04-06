@@ -1,4 +1,5 @@
 use super::sim_engine::{SimEngine, SimOutcome, SimToken};
+use crate::constants::constants::PUMP_FUN_TOKEN_TOTAL_SUPPLY;
 use chrono::Local;
 use std::collections::HashMap;
 use std::fs;
@@ -87,7 +88,6 @@ pub fn generate_report(engine: &SimEngine) -> String {
 
     report.push_str(&format!("  Runtime:              {} min {} sec\n", elapsed_min, elapsed_sec));
     report.push_str(&format!("  Transactions:         {}\n", total_tx));
-    report.push_str(&format!("  Active (unfinished):  {}\n", active));
     report.push_str(&format!("  Buy Amount:           {} SOL\n\n", buy_sol));
 
     // ── Overall stats ──
@@ -113,14 +113,14 @@ pub fn generate_report(engine: &SimEngine) -> String {
 
     if let Some(best) = best_trade {
         report.push_str(&format!(
-            "  Best Trade:           {} | {:.2}% | {}\n",
-            best.mint, best.pnl_pct, best.pattern_label
+            "  Best Trade:           {} | {:.2}% | {} | {}\n",
+            best.mint, best.pnl_pct, best.pattern_label, best.outcome
         ));
     }
     if let Some(worst) = worst_trade {
         report.push_str(&format!(
-            "  Worst Trade:          {} | {:.2}% | {}\n\n",
-            worst.mint, worst.pnl_pct, worst.pattern_label
+            "  Worst Trade:          {} | {:.2}% | {} | {}\n\n",
+            worst.mint, worst.pnl_pct, worst.pattern_label, worst.outcome
         ));
     }
 
@@ -173,11 +173,10 @@ pub fn generate_report(engine: &SimEngine) -> String {
         let sl_count = tokens.iter().filter(|t| t.outcome == SimOutcome::SlHit).count();
         let partial_count = tokens.iter().filter(|t| t.outcome == SimOutcome::Partial).count();
         let timeout_count = tokens.iter().filter(|t| t.outcome == SimOutcome::Timeout).count();
-        let pending_count = tokens.iter().filter(|t| t.outcome == SimOutcome::Pending).count();
 
         report.push_str(&format!(
-            "  │  Outcomes:    TP: {} | SL: {} | Partial: {} | Timeout: {} | Pending: {}\n",
-            tp_count, sl_count, partial_count, timeout_count, pending_count
+            "  │  Outcomes:    TP: {} | SL: {} | Partial: {} | Holding: {}\n",
+            tp_count, sl_count, partial_count, timeout_count
         ));
         report.push_str("  └──\n\n");
     }
@@ -204,12 +203,12 @@ pub fn generate_report(engine: &SimEngine) -> String {
         report.push_str(&format!("  #{} ─ {}\n", i + 1, token.mint));
         report.push_str(&format!("    Pattern:     {}\n", token.pattern_label));
         report.push_str(&format!("    Outcome:     {}\n", token.outcome));
-        report.push_str(&format!("    Confirmed:   {}\n", token.buy_confirmed));
 
         if token.buy_confirmed {
-            report.push_str(&format!("    Buy Price:   {:.12}\n", token.buy_price));
-            report.push_str(&format!("    Exit Price:  {:.12}\n", token.exit_price));
-            report.push_str(&format!("    Max Price:   {:.12}\n", token.max_price));
+            let supply = PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
+            report.push_str(&format!("    Buy MC:      {:.2} SOL\n", token.buy_price * supply));
+            report.push_str(&format!("    Exit MC:     {:.2} SOL\n", token.exit_price * supply));
+            report.push_str(&format!("    Max MC:      {:.2} SOL\n", token.max_price * supply));
 
             let max_potential = if token.buy_price > 0.0 {
                 (token.max_price / token.buy_price - 1.0) * 100.0
@@ -221,11 +220,12 @@ pub fn generate_report(engine: &SimEngine) -> String {
             report.push_str(&format!("    SOL P&L:     {:.6} SOL\n", buy_sol * token.pnl_pct / 100.0));
 
             if !token.tp_triggered_at.is_empty() {
+                let supply = PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                 let tp_strs: Vec<String> = token
                     .tp_triggered_at
                     .iter()
                     .enumerate()
-                    .map(|(i, p)| format!("TP{}: {:.12}", i + 1, p))
+                    .map(|(i, p)| format!("TP{}: {:.2} SOL", i + 1, p * supply))
                     .collect();
                 report.push_str(&format!("    TP Hits:     {}\n", tp_strs.join(" | ")));
             }
