@@ -76,18 +76,24 @@ pub async fn handle_trade_events(
                 tx_id.clone(),
             );
 
-            // If manual pattern matched, apply TP/SL immediately
+            // If manual pattern matched, apply TP/SL
             if let Some(manual_pat) = matched_manual {
-                info!(
-                    "[MANUAL_MATCH] {} | MINT: {} | TP: {:?}%",
-                    manual_pat.label, mint_event.mint, manual_pat.take_profit,
-                );
-                token_data.token_trade_signal = TokenTradeSignal::IsEntryPoint;
-                token_data.set_tp_sell_strategy(
-                    manual_pat.take_profit.clone(),
-                    manual_pat.sell_amounts.clone(),
-                );
-                let _ = TOKEN_DB.upsert(mint_event.mint, token_data.clone());
+                if manual_pat.needs_bundle_buy_confirmation() {
+                    token_data.pending_manual_pattern = Some(manual_pat.clone());
+                    let _ = TOKEN_DB.upsert(mint_event.mint, token_data.clone());
+                } else {
+                    // No bundle filter → entry signal now
+                    info!(
+                        "[MANUAL_MATCH] {} | MINT: {} | TP: {:?}%",
+                        manual_pat.label, mint_event.mint, manual_pat.take_profit,
+                    );
+                    token_data.token_trade_signal = TokenTradeSignal::IsEntryPoint;
+                    token_data.set_tp_sell_strategy(
+                        manual_pat.take_profit.clone(),
+                        manual_pat.sell_amounts.clone(),
+                    );
+                    let _ = TOKEN_DB.upsert(mint_event.mint, token_data.clone());
+                }
             }
 
             minted_in_this_tx.insert(token_data.token_mint);
@@ -176,6 +182,28 @@ pub async fn handle_trade_events(
                         );
                     }
                     _ => {}
+                }
+            }
+
+            // Check pending manual pattern bundle buy CU
+            if token_data.pending_manual_pattern.is_some()
+                && matches!(token_data.token_trade_signal, TokenTradeSignal::None)
+            {
+                let manual_pat = token_data.pending_manual_pattern.as_ref().unwrap();
+                if manual_pat.matches_bundle_buy_cu(unit, price) {
+                    info!(
+                        "[MANUAL_BUNDLE_MATCH] {} | MINT: {} | dev cu: ({},{}) bundle buy cu: ({},{}) | TP: {:?}%",
+                        manual_pat.label, mint,
+                        token_data.mint_budget_compute_unit_limit, token_data.mint_budget_compute_unit_price,
+                        unit, price,
+                        manual_pat.take_profit,
+                    );
+                    token_data.token_trade_signal = TokenTradeSignal::IsEntryPoint;
+                    token_data.set_tp_sell_strategy(
+                        manual_pat.take_profit.clone(),
+                        manual_pat.sell_amounts.clone(),
+                    );
+                    token_data.pending_manual_pattern = None;
                 }
             }
 

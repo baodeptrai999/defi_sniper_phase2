@@ -146,7 +146,7 @@ pub fn extract_mint_tx_context(
                     if program_id == Some(&PUMPFUN_PROGRAM_ID) {
                         if let Some(name) = identify_instruction(&ix.data) {
                             ctx.all_instruction_names
-                                .push(format!("Pumpfun:{}", to_pascal_case(name)));
+                                .push(name.to_string());
                         } else {
                             ctx.all_instruction_names
                                 .push(format!("Pumpfun:Unknown({:?})", &ix.data.get(..8)));
@@ -155,13 +155,13 @@ pub fn extract_mint_tx_context(
                         match ix.data.first() {
                             Some(&2) => ctx
                                 .all_instruction_names
-                                .push("ComputeBudget:SetComputeUnitLimit".to_string()),
+                                .push("CB:SetComputeUnitLimit".to_string()),
                             Some(&3) => ctx
                                 .all_instruction_names
-                                .push("ComputeBudget:SetComputeUnitPrice".to_string()),
+                                .push("CB:SetComputeUnitPrice".to_string()),
                             _ => ctx
                                 .all_instruction_names
-                                .push("ComputeBudget:Other".to_string()),
+                                .push("CB:Other".to_string()),
                         }
                     } else if program_id == Some(&SYSTEM_PROGRAM) {
                         ctx.all_instruction_names
@@ -176,16 +176,6 @@ pub fn extract_mint_tx_context(
                         ctx.all_instruction_names.push(format!("Program:{}", pid));
                     }
                 }
-
-                // Inner instructions from PumpFun (Anchor event logs, etc.)
-                // for inner in meta.inner_instructions.iter().flat_map(|ii| &ii.instructions) {
-                //     let program_id = account_keys.get(inner.program_id_index as usize);
-                //     if program_id == Some(&PUMPFUN_PROGRAM_ID) {
-                //         if let Some(name) = identify_instruction(&inner.data) {
-                //             ctx.all_instruction_names.push(format!("Inner:Pumpfun:{}", to_pascal_case(name)));
-                //         }
-                //     }
-                // }
             }
         }
     }
@@ -197,7 +187,7 @@ pub fn extract_mint_tx_context(
         } else if info.data.starts_with(&ix_discriminator::CREATE_V2) {
             ctx.token_version = TokenVersion::V2;
         } else if info.data.starts_with(&ix_discriminator::BUY) {
-            ctx.buy_ix_name = Some("buy".to_string());
+            ctx.buy_ix_name = Some("Pumpfun:Buy".to_string());
             if let Ok(args) = BuyArgs::deserialize_from_slice(&mut &info.data[8..]) {
                 let structured = BuyInstructionData {
                     ix_name: "buy".to_string(),
@@ -208,7 +198,7 @@ pub fn extract_mint_tx_context(
             }
             break;
         } else if info.data.starts_with(&ix_discriminator::BUY_EXACT_SOL_IN) {
-            ctx.buy_ix_name = Some("buy_exact_sol_in".to_string());
+            ctx.buy_ix_name = Some("Pumpfun:BuyExactSolIn".to_string());
             if let Ok(args) = BuyExactSolInArgs::deserialize_from_slice(&mut &info.data[8..]) {
                 let structured = BuyExactSolInInstructionData {
                     ix_name: "buy_exact_sol_in".to_string(),

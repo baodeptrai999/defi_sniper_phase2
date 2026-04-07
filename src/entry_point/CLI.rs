@@ -1,4 +1,5 @@
 use colored::*;
+use pumpfun_sniper::check_endpoint_status;
 use std::io::{self, Write};
 use std::process::Command;
 
@@ -58,6 +59,8 @@ fn print_menu() {
     println!("{}", menu_row("[ 4. ]", "🔄", "Wallet Rotation", false));
     println!();
     println!("{}", menu_row("[ 5. ]", "📊", "Simulation", false));
+    println!();
+    println!("{}", menu_row("[ 6. ]", "🔗", "Check Endpoint Status", false));
     println!();
     println!("    {}", bar.cyan());
     println!();
@@ -125,6 +128,9 @@ pub async fn main() {
             }
             "5" => {
                 run_binary("simulation");
+            }
+            "6" => {
+                check_endpoint_status().await;
             }
             "0" => {
                 println!("{}", "\n  👋 Exiting...".cyan());

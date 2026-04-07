@@ -350,6 +350,8 @@ pub struct PumpfunBondingCurve {
     pub token_total_supply: u64,
     pub complete: bool,
     pub creator: Pubkey,
+    pub is_mayhem_mode: bool,
+    pub is_cashback_coin: bool,
 }
 
 #[derive(Debug, Clone, BorshDeserialize)]

@@ -5,30 +5,30 @@ pub fn identify_system_program_ix(data: &[u8]) -> String {
         .and_then(|b| <[u8; 4]>::try_from(b).ok())
         .map(u32::from_le_bytes);
     match disc {
-        Some(0) => "SystemProgram:CreateAccount".to_string(),
-        Some(1) => "SystemProgram:Assign".to_string(),
-        Some(2) => "SystemProgram:Transfer".to_string(),
-        Some(3) => "SystemProgram:CreateAccountWithSeed".to_string(),
-        Some(4) => "SystemProgram:AdvanceNonceAccount".to_string(),
-        Some(5) => "SystemProgram:WithdrawNonceAccount".to_string(),
-        Some(6) => "SystemProgram:InitializeNonceAccount".to_string(),
-        Some(7) => "SystemProgram:AuthorizeNonceAccount".to_string(),
-        Some(8) => "SystemProgram:Allocate".to_string(),
-        Some(9) => "SystemProgram:AllocateWithSeed".to_string(),
-        Some(10) => "SystemProgram:AssignWithSeed".to_string(),
-        Some(11) => "SystemProgram:TransferWithSeed".to_string(),
-        Some(12) => "SystemProgram:UpgradeNonceAccount".to_string(),
-        _ => "SystemProgram:Unknown".to_string(),
+        Some(0) => "System:CreateAccount".to_string(),
+        Some(1) => "System:Assign".to_string(),
+        Some(2) => "System:Transfer".to_string(),
+        Some(3) => "System:CreateAccountWithSeed".to_string(),
+        Some(4) => "System:AdvanceNonceAccount".to_string(),
+        Some(5) => "System:WithdrawNonceAccount".to_string(),
+        Some(6) => "System:InitializeNonceAccount".to_string(),
+        Some(7) => "System:AuthorizeNonceAccount".to_string(),
+        Some(8) => "System:Allocate".to_string(),
+        Some(9) => "System:AllocateWithSeed".to_string(),
+        Some(10) => "System:AssignWithSeed".to_string(),
+        Some(11) => "System:TransferWithSeed".to_string(),
+        Some(12) => "System:UpgradeNonceAccount".to_string(),
+        _ => "System:Unknown".to_string(),
     }
 }
 
 /// Identify an Associated Token Program instruction by its single-byte discriminator.
 pub fn identify_ata_program_ix(data: &[u8]) -> String {
     match data.first() {
-        Some(&0) | None => "AssociatedTokenProgram:Create".to_string(),
-        Some(&1) => "AssociatedTokenProgram:CreateIdempotent".to_string(),
-        Some(&2) => "AssociatedTokenProgram:RecoverNested".to_string(),
-        _ => "AssociatedTokenProgram:Unknown".to_string(),
+        Some(&0) | None => "ATA:Create".to_string(),
+        Some(&1) => "ATA:CreateIdempotent".to_string(),
+        Some(&2) => "ATA:RecoverNested".to_string(),
+        _ => "ATA:Unknown".to_string(),
     }
 }
 

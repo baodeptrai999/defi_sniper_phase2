@@ -35,6 +35,7 @@ pub struct SimToken {
     // Bundle tracking (server patterns)
     pub mint_cu: (u32, u64),
     pub buy_tx_history: Vec<((u32, u64), u8)>,
+    pub pending_manual_pattern: Option<ManualPattern>,
 
     // Metadata
     pub tx_count: u64,
@@ -171,6 +172,8 @@ impl SimEngine {
                 .find(|p| p.matches(unit, price, mint_tx_ctx));
 
             if let Some(manual_pat) = matched_manual {
+                let needs_bundle = manual_pat.needs_bundle_buy_confirmation();
+
                 let sim_token = SimToken {
                     mint,
                     pattern_label: manual_pat.label.clone(),
@@ -181,8 +184,8 @@ impl SimEngine {
                     current_price: initial_price,
                     max_price: initial_price,
                     exit_price: 0.0,
-                    tp_levels: manual_pat.take_profit.clone(),
-                    sell_amounts: manual_pat.sell_amounts.clone(),
+                    tp_levels: if needs_bundle { Vec::new() } else { manual_pat.take_profit.clone() },
+                    sell_amounts: if needs_bundle { Vec::new() } else { manual_pat.sell_amounts.clone() },
                     next_tp_index: 0,
                     sl_triggered: false,
                     tp_triggered_at: Vec::new(),
@@ -191,6 +194,7 @@ impl SimEngine {
                     pnl_pct: 0.0,
                     mint_cu: (unit, price),
                     buy_tx_history: Vec::new(),
+                    pending_manual_pattern: if needs_bundle { Some(manual_pat.clone()) } else { None },
                     tx_count: 0,
                     creator: mint_event.creator,
                     is_migrated: false,
@@ -207,27 +211,30 @@ impl SimEngine {
                 *counts.entry(manual_pat.label.clone()).or_insert(0) += 1;
 
                 let mc = initial_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
-                info!(
-                    "\n📌 [SIM] [MANUAL_MATCH]\n\
-                     │  Pattern:    {}\n\
-                     │  Mint:       {}\n\
-                     │  CU:         ({}, {})\n\
-                     │  MC:         {:.2} SOL\n\
-                     │  TP Levels:  {:?}%\n\
-                     │  Sell Amts:  {:?}%\n\
-                     └──────────────────────",
-                    manual_pat.label, mint, unit, price,
-                    mc,
-                    manual_pat.take_profit, manual_pat.sell_amounts,
-                );
+                if needs_bundle {
+                    // No log — only log when full pattern matches (bundle buy CU confirmed)
+                } else {
+                    info!(
+                        "\n📌 [SIM] [MANUAL_MATCH]\n\
+                         │  Pattern:    {}\n\
+                         │  Mint:       {}\n\
+                         │  CU:         ({}, {})\n\
+                         │  MC:         {:.2} SOL\n\
+                         │  TP Levels:  {:?}%\n\
+                         │  Sell Amts:  {:?}%\n\
+                         └──────────────────────",
+                        manual_pat.label, mint, unit, price,
+                        mc,
+                        manual_pat.take_profit, manual_pat.sell_amounts,
+                    );
 
-                // Spawn guaranteed buy confirmation after delay
-                let tokens_arc = self.tokens.clone();
-                let delay = self.confirmation_delay;
-                let buy_sol = self.buy_amount_sol;
-                let sl_pct = self.stop_loss_pct;
-                let buy_fee = self.buy_fee_sol;
-                tokio::spawn(async move {
+                    // Spawn guaranteed buy confirmation after delay
+                    let tokens_arc = self.tokens.clone();
+                    let delay = self.confirmation_delay;
+                    let buy_sol = self.buy_amount_sol;
+                    let sl_pct = self.stop_loss_pct;
+                    let buy_fee = self.buy_fee_sol;
+                    tokio::spawn(async move {
                     tokio::time::sleep(delay).await;
                     let mut tokens = tokens_arc.lock().expect("tokens lock");
                     if let Some(sim) = tokens.get_mut(&mint) {
@@ -259,6 +266,7 @@ impl SimEngine {
                         }
                     }
                 });
+                } // else (no bundle)
             } else if server_matched {
                 // Server pattern — track but no immediate entry (needs bundle match)
                 let sim_token = SimToken {
@@ -281,6 +289,7 @@ impl SimEngine {
                     pnl_pct: 0.0,
                     mint_cu: (unit, price),
                     buy_tx_history: Vec::new(),
+                    pending_manual_pattern: None,
                     tx_count: 0,
                     creator: mint_event.creator,
                     is_migrated: false,
@@ -292,20 +301,6 @@ impl SimEngine {
                 let mut tokens = self.tokens.lock().expect("tokens lock");
                 tokens.insert(mint, sim_token);
                 minted_in_this_tx.insert(mint);
-
-                let mut counts = self.match_count_per_pattern.lock().expect("pattern count lock");
-                *counts.entry(format!("SERVER_CU({},{})", unit, price)).or_insert(0) += 1;
-
-                let mc = initial_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
-                info!(
-                    "\n🔍 [SIM] [SERVER_MINT_MATCH]\n\
-                     │  Mint:       {}\n\
-                     │  CU:         ({}, {})\n\
-                     │  MC:         {:.2} SOL\n\
-                     │  Status:     Waiting for bundle buy match...\n\
-                     └──────────────────────",
-                    mint, unit, price, mc,
-                );
             }
         }
 
@@ -369,6 +364,10 @@ impl SimEngine {
                         mint_pat.0, mint_pat.1, pattern.buy_pattern.len()
                     );
 
+                    let mut counts = self.match_count_per_pattern.lock().expect("pattern count lock");
+                    *counts.entry(sim.pattern_label.clone()).or_insert(0) += 1;
+                    drop(counts);
+
                     let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                     info!(
                         "\n🎯 [SIM] [BUNDLE_MATCH]\n\
@@ -426,6 +425,74 @@ impl SimEngine {
                             }
                         }
                     });
+                }
+
+                // Check pending manual pattern bundle buy CU
+                if let Some(manual_pat) = sim.pending_manual_pattern.clone() {
+                    if sim.tp_levels.is_empty() && manual_pat.matches_bundle_buy_cu(unit, price) {
+                        sim.tp_levels = manual_pat.take_profit.clone();
+                        sim.sell_amounts = manual_pat.sell_amounts.clone();
+                        sim.matched_at = Instant::now();
+                        let label = manual_pat.label.clone();
+
+                        let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
+                        info!(
+                            "\n🎯 [SIM] [MANUAL_BUNDLE_MATCH]\n\
+                             │  Pattern:    {}\n\
+                             │  Mint:       {}\n\
+                             │  Dev CU:     ({}, {})\n\
+                             │  Bundle CU:  ({}, {})\n\
+                             │  MC:         {:.2} SOL\n\
+                             │  TP Levels:  {:?}%\n\
+                             │  Sell Amts:  {:?}%\n\
+                             └──────────────────────",
+                            label, mint,
+                            sim.mint_cu.0, sim.mint_cu.1,
+                            unit, price, mc,
+                            sim.tp_levels, sim.sell_amounts,
+                        );
+
+                        sim.pending_manual_pattern = None;
+
+                        let tokens_arc = self.tokens.clone();
+                        let delay = self.confirmation_delay;
+                        let buy_sol = self.buy_amount_sol;
+                        let sl_pct = self.stop_loss_pct;
+                        let buy_fee = self.buy_fee_sol;
+                        let mint_key = *mint;
+                        tokio::spawn(async move {
+                            tokio::time::sleep(delay).await;
+                            let mut tokens = tokens_arc.lock().expect("tokens lock");
+                            if let Some(sim) = tokens.get_mut(&mint_key) {
+                                if !sim.buy_confirmed && !sim.tp_levels.is_empty() {
+                                    sim.buy_confirmed = true;
+                                    sim.buy_price = sim.current_price;
+                                    sim.total_fees_sol += buy_fee;
+                                    let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
+                                    let mint_mc = sim.mint_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
+                                    let price_change = ((sim.current_price / sim.mint_price) - 1.0) * 100.0;
+                                    info!(
+                                        "\n💰 [SIM] [BUY]\n\
+                                         │  Pattern:    {}\n\
+                                         │  Mint:       {}\n\
+                                         │  Buy MC:     {:.2} SOL\n\
+                                         │  Mint MC:    {:.2} SOL\n\
+                                         │  Δ MC:       {:+.2}%\n\
+                                         │  Amount:     {:.4} SOL\n\
+                                         │  Fee:        {:.6} SOL\n\
+                                         │  SL:         {:.0}%\n\
+                                         │  TP:         {:?}%\n\
+                                         └──────────────────────",
+                                        label, mint_key,
+                                        mc, mint_mc, price_change,
+                                        buy_sol, buy_fee,
+                                        sl_pct * 100.0,
+                                        sim.tp_levels,
+                                    );
+                                }
+                            }
+                        });
+                    }
                 }
             }
         }
@@ -664,7 +731,10 @@ impl SimEngine {
                     sim.exit_reason = "Never confirmed (no trades after match)".to_string();
                 }
             }
-            completed.push(sim);
+            // Only include tokens that were fully matched (have tp_levels)
+            if !sim.tp_levels.is_empty() {
+                completed.push(sim);
+            }
         }
     }
 
