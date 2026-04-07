@@ -137,8 +137,8 @@ impl PumpSwapStruct {
         vec![create_base_ata, create_quote_ata]
     }
 
-    pub fn get_wsol_ix(&self) -> Vec<Instruction> {
-        let slippage_calculated_buy_amount = *BUY_AMOUNT_SOL * 1e9 * *SLIPPAGE;
+    pub fn get_wsol_ix(&self, buy_amount_sol: f64) -> Vec<Instruction> {
+        let slippage_calculated_buy_amount = buy_amount_sol * 1e9 * *SLIPPAGE;
         let turncated_slippage_calculated_buy_amount =
             slippage_calculated_buy_amount.trunc() as u64;
         let wsol_ata = get_associated_token_address(&*SIGNER_PUBKEY, &WSOL);
@@ -171,6 +171,7 @@ impl PumpSwapStruct {
         updated_coin_creator: Pubkey,
         is_cashback_enabled: bool,
         token_price: f64,
+        buy_amount_sol: f64,
     ) -> Instruction {
         //get custom accounts
 
@@ -188,9 +189,9 @@ impl PumpSwapStruct {
         //build instruction data
         let mut data = Vec::new();
 
-        let base_out: f64 = (*BUY_AMOUNT_SOL / token_price) * 10f64.powi(6);
+        let base_out: f64 = (buy_amount_sol / token_price) * 10f64.powi(6);
         let truncated_base_out: u64 = base_out.trunc() as u64;
-        let max_quote_in: f64 = *BUY_AMOUNT_SOL * 10f64.powi(9) * *SLIPPAGE;
+        let max_quote_in: f64 = buy_amount_sol * 10f64.powi(9) * *SLIPPAGE;
         let turncated_max_quote_in: u64 = max_quote_in.trunc() as u64;
 
         data.extend_from_slice(&PUMPSWAP_BUY_DISCRIMINATOR);

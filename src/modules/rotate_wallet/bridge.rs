@@ -42,7 +42,7 @@ pub async fn bridge_sol_to_bnb(
         SOL_NATIVE_CURRENCY,
         BNB_NATIVE_CURRENCY,
         &transfer_lamports.to_string(),
-        &format!("{}", bnb_address),
+        &bnb_address.to_string(),
     )
     .await?;
 
@@ -92,7 +92,7 @@ pub async fn bridge_bnb_to_sol(
     let new_sol_private_key = bs58::encode(new_sol_keypair.to_bytes()).into_string();
 
     let quote = get_relay_quote(
-        &format!("{}", bnb_address),
+        &bnb_address.to_string(),
         BNB_CHAIN_ID,
         SOLANA_CHAIN_ID,
         BNB_NATIVE_CURRENCY,
@@ -159,6 +159,7 @@ async fn wait_for_bridge(
     label: &str,
 ) -> Result<bool, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
+    let url = format!("{}?requestId={}", RELAY_STATUS_URL, request_id);
     let start = std::time::Instant::now();
 
     loop {
@@ -169,7 +170,6 @@ async fn wait_for_bridge(
 
         tokio::time::sleep(tokio::time::Duration::from_millis(BRIDGE_POLL_INTERVAL_MS)).await;
 
-        let url = format!("{}?requestId={}", RELAY_STATUS_URL, request_id);
         match client.get(&url).send().await {
             Ok(resp) => {
                 if let Ok(json) = resp.json::<serde_json::Value>().await {

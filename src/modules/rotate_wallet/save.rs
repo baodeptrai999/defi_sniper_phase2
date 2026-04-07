@@ -1,9 +1,9 @@
 use crate::*;
-use std::{fs, path::Path};
+use std::path::Path;
 
 /// Save rotation wallet details as a JSON file under src/assets/rotation/.
 /// All fields are optional so partial results can be saved on failure.
-pub fn save_rotation_json(
+pub async fn save_rotation_json(
     status: &str,
     error_msg: Option<&str>,
     old_sol_pubkey: &str,
@@ -40,7 +40,7 @@ pub fn save_rotation_json(
     }
 
     let dir = Path::new("src/assets/rotation");
-    fs::create_dir_all(dir)?;
+    tokio::fs::create_dir_all(dir).await?;
 
     let now = chrono::Local::now();
     let filename = format!(
@@ -48,9 +48,9 @@ pub fn save_rotation_json(
         now.format("%Y_%m_%d_%H_%M_%S")
     );
     let path = dir.join(&filename);
-    fs::write(&path, serde_json::to_string_pretty(&json)?)?;
+    tokio::fs::write(&path, serde_json::to_string_pretty(&json)?).await?;
 
-    let path_str = path.to_string_lossy().to_string();
+    let path_str = path.display().to_string();
     info!("[ROTATE] Rotation JSON saved: {}", path_str);
     Ok(path_str)
 }

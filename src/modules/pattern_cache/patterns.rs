@@ -40,9 +40,10 @@ use super::pattern_translator::{BuyIxRaw, ManualPatternRaw};
 /// │      }),                                                            │
 /// │                                                                     │
 /// │      // ── Trade settings ──                                        │
-/// │      stop_loss: Some("50".to_string()),  // or None                 │
+/// │      stop_loss: Some(70.0),              // or None for config default│
 /// │      take_profit: vec![200.0, 400.0],                               │
 /// │      sell_amounts: Some(vec![50.0, 50.0]),                          │
+/// │      buy_amount_sol: Some(0.03),         // or None for config default│
 /// │                                                                     │
 /// │      // ── Tx metadata filters ──                                   │
 /// │      token_version: Some("V2".to_string()),  // "V1" or "V2"        │
@@ -80,6 +81,7 @@ pub fn get_raw_manual_patterns() -> Vec<ManualPatternRaw> {
             token_version: None,
             alt_addresses: Some(vec!["7mFD2mUtRS65XstiSAvCJuYmdesZoQwCwRJhq1p3eRMe".to_string()]),
             mint_tx_version: Some("V0".to_string()),
+            buy_amount_sol: None,
         },
 
         ManualPatternRaw {
@@ -96,13 +98,14 @@ pub fn get_raw_manual_patterns() -> Vec<ManualPatternRaw> {
             token_version: Some("V1".to_string()),
             alt_addresses: Some(vec!["3uJ6k2iQvehx8AwHDLMjCeFzksaxNWgF9DFNERMHxJXw".to_string()]),
             mint_tx_version: Some("V0".to_string()),
+            buy_amount_sol: None,
         },
 
         ManualPatternRaw {
             label: Some("PATTERN_3".to_string()),
             dev_cu_price: Some("NULL".to_string()),
             dev_cu_limit: Some("NULL".to_string()),
-            mint_instructions: None,  //Some("Pumpfun:CreateV2>>ATA:Create>>Pumpfun:BuyExactSolIn".to_string())
+            mint_instructions: None,
             dev_buy_instruction_data: None,
             bundle_buy_cu_limit: Some("140000".to_string()),
             bundle_buy_cu_price: Some("320000".to_string()),
@@ -112,13 +115,14 @@ pub fn get_raw_manual_patterns() -> Vec<ManualPatternRaw> {
             token_version: Some("V2".to_string()),
             alt_addresses: None,
             mint_tx_version: None,
+            buy_amount_sol: None,
         },
 
         ManualPatternRaw {
             label: Some("PATTERN_4".to_string()),
             dev_cu_price: Some("1000".to_string()),
             dev_cu_limit: Some("NOT_NULL".to_string()),
-            mint_instructions: None,  //Some("Pumpfun:CreateV2>>ATA:Create>>Pumpfun:BuyExactSolIn".to_string())
+            mint_instructions: None,
             dev_buy_instruction_data: None,
             bundle_buy_cu_limit: None,
             bundle_buy_cu_price: None,
@@ -128,13 +132,14 @@ pub fn get_raw_manual_patterns() -> Vec<ManualPatternRaw> {
             token_version: Some("V2".to_string()),
             alt_addresses: Some(vec!["61zTJzmPuCticMHiFgXr2ohPupKqRey5SufNwEnqhsTx".to_string()]),
             mint_tx_version: None,
+            buy_amount_sol: None,
         },
 
         ManualPatternRaw {
             label: Some("PATTERN_5".to_string()),
             dev_cu_price: Some("300000".to_string()),
             dev_cu_limit: Some("600000".to_string()),
-            mint_instructions: None,  //Some("Pumpfun:CreateV2>>ATA:Create>>Pumpfun:BuyExactSolIn".to_string())
+            mint_instructions: None,
             dev_buy_instruction_data: None,
             bundle_buy_cu_limit: Some("600000".to_string()),
             bundle_buy_cu_price: Some("300000".to_string()),
@@ -144,6 +149,7 @@ pub fn get_raw_manual_patterns() -> Vec<ManualPatternRaw> {
             token_version: Some("V1".to_string()),
             alt_addresses: None,
             mint_tx_version: Some("Legacy".to_string()),
+            buy_amount_sol: None,
         },
 
         ManualPatternRaw {
@@ -160,6 +166,7 @@ pub fn get_raw_manual_patterns() -> Vec<ManualPatternRaw> {
             token_version: Some("V2".to_string()),
             alt_addresses: Some(vec!["61zTJzmPuCticMHiFgXr2ohPupKqRey5SufNwEnqhsTx".to_string()]),
             mint_tx_version: Some("V0".to_string()),
+            buy_amount_sol: None,
         },
 
 

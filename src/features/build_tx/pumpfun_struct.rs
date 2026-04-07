@@ -98,7 +98,7 @@ impl PumpfunStruct {
         }
     }
 
-    pub fn get_buy_ix(&mut self, updated_token_creator: Pubkey) -> Instruction {
+    pub fn get_buy_ix(&mut self, updated_token_creator: Pubkey, buy_amount_sol: f64) -> Instruction {
         //get custom accounts
         let (updated_creator_vault, _) = Pubkey::find_program_address(
             &[PUMPFUN_CREATOR_VAULT_SEED, &updated_token_creator.as_ref()],
@@ -108,7 +108,7 @@ impl PumpfunStruct {
         //build instruction data — buy_exact_sol_in
         let mut data = Vec::new();
 
-        let spendable_sol_in: u64 = (*BUY_AMOUNT_SOL * 10f64.powi(9)).trunc() as u64;
+        let spendable_sol_in: u64 = (buy_amount_sol * 10f64.powi(9)).trunc() as u64;
         let min_tokens_out: u64 = 1;
 
         data.extend_from_slice(&ix_discriminator::BUY_EXACT_SOL_IN);

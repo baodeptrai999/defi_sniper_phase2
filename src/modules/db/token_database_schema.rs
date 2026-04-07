@@ -31,6 +31,8 @@ pub struct TokenDatabaseSchema {
     pub pending_tp_sell_index: Option<usize>,
     pub pending_tp_sell_amount: u64,
     pub is_cashback_enabled: bool,
+    pub override_buy_amount_sol: Option<f64>,
+    pub override_stop_loss: Option<f64>,
 }
 
 impl TokenDatabaseSchema {
@@ -71,6 +73,8 @@ impl TokenDatabaseSchema {
             pending_tp_sell_index: None,
             pending_tp_sell_amount: 0,
             is_cashback_enabled: mint_event.is_cashback_enabled,
+            override_buy_amount_sol: None,
+            override_stop_loss: None,
         };
 
         let _ = TOKEN_DB.upsert(mint_event.mint.clone(), token_data.clone());
@@ -82,7 +86,7 @@ impl TokenDatabaseSchema {
             return;
         }
 
-        if self.token_price < self.token_buying_point_price * *STOP_LOSS
+        if self.token_price < self.token_buying_point_price * self.override_stop_loss.unwrap_or(*STOP_LOSS)
             && self.sl_state != SLMode::Triggered
         {
             update!(

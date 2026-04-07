@@ -55,12 +55,12 @@ pub async fn rotate_wallet() -> Result<(), Box<dyn std::error::Error>> {
                 &old_pubkey_str,
                 &old_private_key,
                 None, None, None, None,
-            );
+            ).await;
             return Err(e);
         }
     };
 
-    let bnb_addr_str = format!("{}", sol_to_bnb.bnb_address);
+    let bnb_addr_str = sol_to_bnb.bnb_address.to_string();
 
     info!("[ROTATE] BNB Address:     {}", bnb_addr_str);
     info!("[ROTATE] BNB Private Key: 0x{}", sol_to_bnb.bnb_private_key);
@@ -94,7 +94,7 @@ pub async fn rotate_wallet() -> Result<(), Box<dyn std::error::Error>> {
                 Some(&bnb_addr_str),
                 Some(&sol_to_bnb.bnb_private_key),
                 None, None,
-            );
+            ).await;
             return Err(e);
         }
     };
@@ -123,6 +123,10 @@ pub async fn rotate_wallet() -> Result<(), Box<dyn std::error::Error>> {
     info!("[ROTATE] New Wallet:      {}", bnb_to_sol.new_sol_pubkey);
     info!("[ROTATE] New Private Key: {}", bnb_to_sol.new_sol_private_key);
     info!("[ROTATE] New Balance:     {:.9} SOL", new_balance_sol);
+
+    let fee_lamports = old_balance.saturating_sub(new_balance);
+    let fee_sol = fee_lamports as f64 / LAMPORTS_PER_SOL as f64;
+    info!("[ROTATE] Total Fee:       {:.9} SOL ({} lamports)", fee_sol, fee_lamports);
     info!("");
     info!("⚠ Update Config.toml → private_key = \"{}\"", bnb_to_sol.new_sol_private_key);
 
@@ -136,7 +140,7 @@ pub async fn rotate_wallet() -> Result<(), Box<dyn std::error::Error>> {
         Some(&sol_to_bnb.bnb_private_key),
         Some(&bnb_to_sol.new_sol_pubkey.to_string()),
         Some(&bnb_to_sol.new_sol_private_key),
-    )?;
+    ).await?;
 
     Ok(())
 }

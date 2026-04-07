@@ -7,7 +7,7 @@ pub mod timer;
 pub mod pattern_cache;
 pub mod idl;
 pub mod backtesting;
-pub mod check_status;
+pub mod check_endpoints;
 pub mod rotate_wallet;
 
 pub use macros::*;
@@ -19,5 +19,5 @@ pub use timer::*;
 pub use pattern_cache::*;
 pub use idl::*;
 pub use backtesting::*;
-pub use check_status::*;
+pub use check_endpoints::*;
 pub use rotate_wallet::*;

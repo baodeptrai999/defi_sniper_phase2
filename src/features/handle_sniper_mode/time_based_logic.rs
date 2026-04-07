@@ -15,8 +15,9 @@ pub async fn proceed_time_based_buying_logic(
                 let create_ata_ix = updated_token_data
                     .pump_fun_swap_accounts
                     .get_create_ata_idempotent_ix();
+                let buy_sol = updated_token_data.override_buy_amount_sol.unwrap_or(*BUY_AMOUNT_SOL);
                 let buy_ix = updated_token_data.pump_fun_swap_accounts.get_buy_ix(
-                    *BUY_AMOUNT_SOL * 10f64.powi(9),
+                    buy_sol * 10f64.powi(9),
                     updated_token_data.token_price,
                 );
 

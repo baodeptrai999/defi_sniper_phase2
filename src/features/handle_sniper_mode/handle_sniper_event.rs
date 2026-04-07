@@ -79,15 +79,21 @@ pub async fn handle_trade_events(
             // If manual pattern matched, apply TP/SL
             if let Some(manual_pat) = matched_manual {
                 if manual_pat.needs_bundle_buy_confirmation() {
+                    token_data.override_buy_amount_sol = manual_pat.buy_amount_sol;
+                    token_data.override_stop_loss = manual_pat.stop_loss.map(|v| v / 100.0);
                     token_data.pending_manual_pattern = Some(manual_pat.clone());
                     let _ = TOKEN_DB.upsert(mint_event.mint, token_data.clone());
                 } else {
                     // No bundle filter → entry signal now
+                    let log_buy = manual_pat.buy_amount_sol.unwrap_or(*BUY_AMOUNT_SOL);
+                    let log_sl = manual_pat.stop_loss.unwrap_or(*STOP_LOSS * 100.0);
                     info!(
-                        "[MANUAL_MATCH] {} | MINT: {} | TP: {:?}%",
-                        manual_pat.label, mint_event.mint, manual_pat.take_profit,
+                        "[MANUAL_MATCH] {} | MINT: {} | Buy: {:.4} SOL | SL: {:.0}% | TP: {:?}%",
+                        manual_pat.label, mint_event.mint, log_buy, log_sl, manual_pat.take_profit,
                     );
                     token_data.token_trade_signal = TokenTradeSignal::IsEntryPoint;
+                    token_data.override_buy_amount_sol = manual_pat.buy_amount_sol;
+                    token_data.override_stop_loss = manual_pat.stop_loss.map(|v| v / 100.0);
                     token_data.set_tp_sell_strategy(
                         manual_pat.take_profit.clone(),
                         manual_pat.sell_amounts.clone(),
@@ -191,14 +197,19 @@ pub async fn handle_trade_events(
             {
                 let manual_pat = token_data.pending_manual_pattern.as_ref().unwrap();
                 if manual_pat.matches_bundle_buy_cu(unit, price) {
+                    let log_buy = manual_pat.buy_amount_sol.unwrap_or(*BUY_AMOUNT_SOL);
+                    let log_sl = manual_pat.stop_loss.unwrap_or(*STOP_LOSS * 100.0);
                     info!(
-                        "[MANUAL_BUNDLE_MATCH] {} | MINT: {} | dev cu: ({},{}) bundle buy cu: ({},{}) | TP: {:?}%",
+                        "[MANUAL_BUNDLE_MATCH] {} | MINT: {} | dev cu: ({},{}) bundle buy cu: ({},{}) | Buy: {:.4} SOL | SL: {:.0}% | TP: {:?}%",
                         manual_pat.label, mint,
                         token_data.mint_budget_compute_unit_limit, token_data.mint_budget_compute_unit_price,
                         unit, price,
+                        log_buy, log_sl,
                         manual_pat.take_profit,
                     );
                     token_data.token_trade_signal = TokenTradeSignal::IsEntryPoint;
+                    token_data.override_buy_amount_sol = manual_pat.buy_amount_sol;
+                    token_data.override_stop_loss = manual_pat.stop_loss.map(|v| v / 100.0);
                     token_data.set_tp_sell_strategy(
                         manual_pat.take_profit.clone(),
                         manual_pat.sell_amounts.clone(),

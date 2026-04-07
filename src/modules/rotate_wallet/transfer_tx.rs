@@ -104,7 +104,7 @@ fn parse_instructions(
     Ok(instructions)
 }
 
-/// Fetch address lookup tables referenced in a relay quote item.
+/// Fetch address lookup tables referenced in a relay quote item (concurrent).
 async fn fetch_lookup_tables(
     item: &serde_json::Value,
 ) -> Result<Vec<AddressLookupTableAccount>, Box<dyn std::error::Error>> {
@@ -113,26 +113,28 @@ async fn fetch_lookup_tables(
         None => return Ok(vec![]),
     };
 
-    let mut tables = Vec::new();
-    for addr_val in alt_addrs {
-        let addr_str = addr_val.as_str().ok_or("Invalid ALT address")?;
-        let alt_pubkey = Pubkey::from_str(addr_str)?;
-        let account = RPC_CLIENT.get_account(&alt_pubkey).await?;
-        let lookup_table =
-            solana_sdk::address_lookup_table::state::AddressLookupTable::deserialize(
-                &account.data,
-            )?;
-        tables.push(AddressLookupTableAccount {
-            key: alt_pubkey,
-            addresses: lookup_table.addresses.to_vec(),
-        });
-    }
+    let pubkeys: Vec<Pubkey> = alt_addrs
+        .iter()
+        .map(|v| Pubkey::from_str(v.as_str().unwrap_or_default()))
+        .collect::<Result<_, _>>()?;
 
-    Ok(tables)
+    let futures: Vec<_> = pubkeys
+        .iter()
+        .map(|pk| async move {
+            let account = RPC_CLIENT.get_account(pk).await?;
+            let lookup_table =
+                solana_sdk::address_lookup_table::state::AddressLookupTable::deserialize(
+                    &account.data,
+                )?;
+            Ok::<_, Box<dyn std::error::Error>>(AddressLookupTableAccount {
+                key: *pk,
+                addresses: lookup_table.addresses.to_vec(),
+            })
+        })
+        .collect();
+
+    futures::future::try_join_all(futures).await
 }
-
-
-
 
 /// Submit all BNB transactions from relay quote steps.
 /// Returns list of (tx_hash, block_number) pairs.
@@ -190,7 +192,7 @@ pub async fn execute_bnb_steps<P: Provider>(
             }
 
             let pending = provider.send_transaction(tx_req).await?;
-            let tx_hash = format!("{}", pending.tx_hash());
+            let tx_hash = pending.tx_hash().to_string();
             let receipt = pending.get_receipt().await?;
             results.push((tx_hash, receipt.block_number));
         }

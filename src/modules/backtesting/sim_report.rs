@@ -57,11 +57,11 @@ pub fn generate_report(engine: &SimEngine) -> String {
         .iter()
         .min_by(|a, b| a.pnl_pct.partial_cmp(&b.pnl_pct).unwrap_or(std::cmp::Ordering::Equal));
 
-    let buy_sol = engine.buy_amount_sol;
-    let total_invested = total_bought as f64 * buy_sol;
+    let default_buy_sol = engine.buy_amount_sol;
+    let total_invested: f64 = bought_tokens.iter().map(|t| t.buy_amount_sol).sum();
     let total_returned: f64 = bought_tokens
         .iter()
-        .map(|t| buy_sol * (1.0 + t.pnl_pct / 100.0))
+        .map(|t| t.buy_amount_sol * (1.0 + t.pnl_pct / 100.0))
         .sum();
     let net_profit_sol = total_returned - total_invested;
     let roi = if total_invested > 0.0 {
@@ -88,7 +88,7 @@ pub fn generate_report(engine: &SimEngine) -> String {
 
     report.push_str(&format!("  Runtime:              {} min {} sec\n", elapsed_min, elapsed_sec));
     report.push_str(&format!("  Transactions:         {}\n", total_tx));
-    report.push_str(&format!("  Buy Amount:           {} SOL\n", buy_sol));
+    report.push_str(&format!("  Buy Amount (default): {} SOL\n", default_buy_sol));
     report.push_str(&format!("  Buy Fee:              {:.6} SOL\n", engine.buy_fee_sol));
     report.push_str(&format!("  Sell Fee:             {:.6} SOL\n\n", engine.sell_fee_sol));
 
@@ -167,10 +167,10 @@ pub fn generate_report(engine: &SimEngine) -> String {
         let p_pnl: f64 = bought.iter().map(|t| t.pnl_pct).sum();
         let p_avg = if p_total > 0 { p_pnl / p_total as f64 } else { 0.0 };
 
-        let p_invested = p_total as f64 * buy_sol;
+        let p_invested: f64 = bought.iter().map(|t| t.buy_amount_sol).sum();
         let p_returned: f64 = bought
             .iter()
-            .map(|t| buy_sol * (1.0 + t.pnl_pct / 100.0))
+            .map(|t| t.buy_amount_sol * (1.0 + t.pnl_pct / 100.0))
             .sum();
         let p_net = p_returned - p_invested;
 
@@ -229,7 +229,7 @@ pub fn generate_report(engine: &SimEngine) -> String {
             };
             report.push_str(&format!("    Max Gain:    {:.2}%\n", max_potential));
             report.push_str(&format!("    P&L:         {:.2}%\n", token.pnl_pct));
-            report.push_str(&format!("    SOL P&L:     {:.6} SOL\n", buy_sol * token.pnl_pct / 100.0));
+            report.push_str(&format!("    SOL P&L:     {:.6} SOL\n", token.buy_amount_sol * token.pnl_pct / 100.0));
             report.push_str(&format!("    Fees:        {:.6} SOL (buy:1 + sell:{})\n", token.total_fees_sol, token.sell_count));
 
             if !token.tp_triggered_at.is_empty() {

@@ -14,18 +14,23 @@ pub async fn make_sniper_tx(trade_token_data_map: &HashMap<Pubkey, TokenDatabase
             if !*DEV_MODE || buy_tx_remaining_counter != 0 {
                 decrese_buy_tx_remain_counter();
 
+                let buy_sol = token_data.override_buy_amount_sol.unwrap_or(*BUY_AMOUNT_SOL);
                 let mut ix: Vec<Instruction> = Vec::new();
                 let create_ata_ix = token_data.pumpfun_struct.get_create_ata_idempotent_ix();
                 let buy_ix = token_data
                     .pumpfun_struct
-                    .get_buy_ix(token_data.token_creator);
+                    .get_buy_ix(token_data.token_creator, buy_sol);
 
                 ix.push(create_ata_ix);
                 ix.push(buy_ix);
 
                 token_data.token_trade_signal = TokenTradeSignal::EntrySubmitted;
 
-                let tag = format!("[BUY] MINT: {}", token_data.token_mint);
+                let sl_pct = token_data.override_stop_loss.unwrap_or(*STOP_LOSS) * 100.0;
+                let tag = format!(
+                    "[BUY] MINT: {} | Buy: {:.4} SOL | SL: {:.0}%",
+                    token_data.token_mint, buy_sol, sl_pct,
+                );
 
                 let _ = TOKEN_DB.upsert(token_data.token_mint, token_data.clone());
 

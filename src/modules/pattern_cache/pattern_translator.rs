@@ -89,6 +89,7 @@ pub struct ManualPattern {
     pub token_version: Option<String>,       // "V1", "V2"
     pub alt_addresses: Option<Vec<Pubkey>>,
     pub mint_tx_version: Option<String>,     // "Legacy", "V0"
+    pub buy_amount_sol: Option<f64>,
 }
 
 // ── Raw DSL input — all fields optional except take_profit ──
@@ -102,12 +103,13 @@ pub struct ManualPatternRaw {
     pub dev_buy_instruction_data: Option<BuyIxRaw>,
     pub bundle_buy_cu_limit: Option<String>,
     pub bundle_buy_cu_price: Option<String>,
-    pub stop_loss: Option<String>,
+    pub stop_loss: Option<f64>,
     pub take_profit: Vec<f64>,
     pub sell_amounts: Option<Vec<f64>>,
     pub token_version: Option<String>,
     pub alt_addresses: Option<Vec<String>>,
     pub mint_tx_version: Option<String>,
+    pub buy_amount_sol: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -171,14 +173,8 @@ impl ManualPatternRaw {
             }
         });
 
-        let stop_loss = self.stop_loss.and_then(|s| {
-            let upper = s.trim().to_uppercase();
-            if upper.is_empty() || upper == "NULL" {
-                None
-            } else {
-                s.trim().parse::<f64>().ok()
-            }
-        });
+        let stop_loss = self.stop_loss.filter(|&v| v != 0.0);
+        let buy_amount_sol = self.buy_amount_sol.filter(|&v| v > 0.0);
 
         let take_profit = self.take_profit;
         if take_profit.is_empty() {
@@ -223,6 +219,7 @@ impl ManualPatternRaw {
             token_version,
             alt_addresses,
             mint_tx_version,
+            buy_amount_sol,
         })
     }
 }
