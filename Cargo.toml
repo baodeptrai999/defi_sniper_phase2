@@ -40,6 +40,9 @@ base64 = "0.13"
 solana-account-decoder-client-types = "2.3.6"
 csv = "1.4.0"
 rand = "0.10.0"
+alloy = { version = "1.8", features = ["provider-http", "signer-local", "network", "rpc-types"] }
+hex = "0.4"
+bs58 = "0.5"
 
 [[bin]]
 name = "pumpfun-sniper"
@@ -60,3 +63,7 @@ path = "src/entry_point/all_sell.rs"
 [[bin]]
 name = "simulation"
 path = "src/entry_point/simulation.rs"
+
+[[bin]]
+name = "rotate-wallet"
+path = "src/entry_point/rotate_wallet.rs"

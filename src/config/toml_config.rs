@@ -16,6 +16,7 @@ pub struct ConnectionConfig {
     pub grpc_endpoint: String,
     pub grpc_token: String,
     pub rpc_endpoint: String,
+    pub bnb_rpc_endpoint: String,
 }
 
 #[derive(Debug, Deserialize)]

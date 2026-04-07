@@ -124,7 +124,7 @@ pub async fn main() {
                 run_binary("all-sell");
             }
             "4" => {
-                println!("{}", "\n  🔄 Wallet Rotation - Coming soon".yellow());
+                run_binary("rotate-wallet");
             }
             "5" => {
                 run_binary("simulation");

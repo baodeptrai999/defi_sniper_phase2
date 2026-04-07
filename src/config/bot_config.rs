@@ -47,6 +47,8 @@ pub static RPC_CLIENT: Lazy<Arc<RpcClient>> = Lazy::new(|| {
 pub static GRPC_ENDPOINT: Lazy<String> =
     Lazy::new(|| CONFIG.connection_config.grpc_endpoint.clone());
 pub static GRPC_TOKEN: Lazy<String> = Lazy::new(|| CONFIG.connection_config.grpc_token.clone());
+pub static BNB_RPC_ENDPOINT: Lazy<String> =
+    Lazy::new(|| CONFIG.connection_config.bnb_rpc_endpoint.clone());
 
 //Buy setting
 pub static BUY_AMOUNT_SOL: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.buy_amount_sol);

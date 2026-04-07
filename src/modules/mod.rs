@@ -8,6 +8,7 @@ pub mod pattern_cache;
 pub mod idl;
 pub mod backtesting;
 pub mod check_status;
+pub mod rotate_wallet;
 
 pub use macros::*;
 pub use files::*;
@@ -19,3 +20,4 @@ pub use pattern_cache::*;
 pub use idl::*;
 pub use backtesting::*;
 pub use check_status::*;
+pub use rotate_wallet::*;
