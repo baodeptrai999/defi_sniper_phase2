@@ -58,6 +58,7 @@ pub static PROFIT_SEQUENCE: Lazy<u32> = Lazy::new(|| CONFIG.buy_setting.profit_s
 pub static LOSS_MULTIPLY: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.loss_multiply.clamp(0.01, 1.0));
 pub static PROFIT_MULTIPLY: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.profit_multiply.max(1.0));
 pub static MAX_BUY_AMOUNT_MULTIPLY: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.max_buy_amount_multiply.max(0.01));
+pub static MIN_BUY_AMOUNT_MULTIPLY: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.min_buy_amount_multiply.clamp(0.001, 1.0));
 
 //Slippage
 pub static SLIPPAGE: Lazy<f64> =

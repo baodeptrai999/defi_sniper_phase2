@@ -95,24 +95,7 @@ pub async fn handle_trade_events(
                     token_data.token_trade_signal = TokenTradeSignal::IsEntryPoint;
                     token_data.override_buy_amount_sol = manual_pat.buy_amount_sol;
                     token_data.override_stop_loss = manual_pat.stop_loss.map(|v| v / 100.0);
-                    // In adaptive mode: override TP with computed value
-                    let (live_tp, live_sell) = if AdaptiveTpEngine::is_adaptive() && !manual_pat.take_profit.is_empty() {
-                        let tp = ADAPTIVE_TP.get_adaptive_tp(&manual_pat.label, manual_pat.take_profit[0]);
-                        info!(
-                            "\n🎯 [ADAPTIVE_TP] [{}] TP override at mint match\n\
-                             │  Pattern:      {}\n\
-                             │  Mint:         {}\n\
-                             │  Original TP:  {:.1}%\n\
-                             │  Adaptive TP:  {:.1}%\n\
-                             └──────────────────────",
-                            *TP_MODE, manual_pat.label, mint_event.mint,
-                            manual_pat.take_profit[0], tp,
-                        );
-                        (vec![tp], vec![100.0])
-                    } else {
-                        (manual_pat.take_profit.clone(), manual_pat.sell_amounts.clone())
-                    };
-                    token_data.set_tp_sell_strategy(live_tp, live_sell);
+                    token_data.set_tp_sell_strategy(manual_pat.take_profit.clone(), manual_pat.sell_amounts.clone());
                     let _ = TOKEN_DB.upsert(mint_event.mint, token_data.clone());
                 }
             }
@@ -188,27 +171,10 @@ pub async fn handle_trade_events(
                     mint_pat.0, mint_pat.1, pattern.buy_pattern.len()
                 );
                 token_data.matched_pattern_label = server_label.clone();
-                let primary_tp_threshold = pattern.primary_tp_threshold();
-                // In adaptive mode: override TP with computed value
-                if AdaptiveTpEngine::is_adaptive() && !pattern.tp_threshold.is_empty() {
-                    let tp = ADAPTIVE_TP.get_adaptive_tp(&server_label, pattern.tp_threshold[0]);
-                    info!(
-                        "\n🎯 [ADAPTIVE_TP] [{}] TP override at bundle match\n\
-                         │  Pattern:      {}\n\
-                         │  Mint:         {}\n\
-                         │  Original TP:  {:.1}%\n\
-                         │  Adaptive TP:  {:.1}%\n\
-                         └──────────────────────",
-                        *TP_MODE, server_label, mint,
-                        pattern.tp_threshold[0], tp,
-                    );
-                    token_data.set_tp_sell_strategy(vec![tp], vec![100.0]);
-                } else {
-                    token_data.set_tp_sell_strategy(
-                        pattern.tp_threshold.clone(),
-                        pattern.sell_amounts.clone(),
-                    );
-                }
+                token_data.set_tp_sell_strategy(
+                    pattern.tp_threshold.clone(),
+                    pattern.sell_amounts.clone(),
+                );
 
                 match token_data.token_trade_signal {
                     TokenTradeSignal::None => {
@@ -216,11 +182,10 @@ pub async fn handle_trade_events(
                     }
                     TokenTradeSignal::EntrySubmitted => {
                         info!(
-                            "🔄 [TP_UPDATE] MINT: {} | pattern: {:?} | new TP: {:?}% (real: {:?}%)",
+                            "🔄 [TP_UPDATE] MINT: {} | pattern: {:?} | new TP: {:?}%",
                             mint,
                             pattern.buy_pattern,
                             pattern.tp_threshold,
-                            primary_tp_threshold * *REAL_TP_MULTIPLY,
                         );
                     }
                     _ => {}
@@ -246,24 +211,7 @@ pub async fn handle_trade_events(
                     token_data.token_trade_signal = TokenTradeSignal::IsEntryPoint;
                     token_data.override_buy_amount_sol = manual_pat.buy_amount_sol;
                     token_data.override_stop_loss = manual_pat.stop_loss.map(|v| v / 100.0);
-                    // In adaptive mode: override TP with computed value
-                    let (live_tp, live_sell) = if AdaptiveTpEngine::is_adaptive() && !manual_pat.take_profit.is_empty() {
-                        let tp = ADAPTIVE_TP.get_adaptive_tp(&manual_pat.label, manual_pat.take_profit[0]);
-                        info!(
-                            "\n🎯 [ADAPTIVE_TP] [{}] TP override at manual bundle match\n\
-                             │  Pattern:      {}\n\
-                             │  Mint:         {}\n\
-                             │  Original TP:  {:.1}%\n\
-                             │  Adaptive TP:  {:.1}%\n\
-                             └──────────────────────",
-                            *TP_MODE, manual_pat.label, mint,
-                            manual_pat.take_profit[0], tp,
-                        );
-                        (vec![tp], vec![100.0])
-                    } else {
-                        (manual_pat.take_profit.clone(), manual_pat.sell_amounts.clone())
-                    };
-                    token_data.set_tp_sell_strategy(live_tp, live_sell);
+                    token_data.set_tp_sell_strategy(manual_pat.take_profit.clone(), manual_pat.sell_amounts.clone());
                     token_data.pending_manual_pattern = None;
                 }
             }

@@ -1,27 +1,8 @@
 use crate::*;
 use solana_sdk::pubkey::Pubkey;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-
-// ── ATH tracker for EMA/AVERAGE mode ──
-// Tracks a token's all-time-high price for 1 hour after match,
-// then feeds the peak multiple into the pattern's EMA or average window.
-#[derive(Debug, Clone)]
-struct AthTracker {
-    mint: Pubkey,
-    pattern_label: String,
-    buy_price: f64,      // entry price (price at buy confirmation)
-    max_price: f64,      // ATH observed so far
-    started_at: Instant,
-}
-
-// ── Per-pattern EMA state ──
-#[derive(Debug, Clone)]
-pub struct PatternEmaState {
-    pub ema_tp: f64,       // current EMA value (as a multiple, e.g. 1.5 = 150%)
-    pub update_count: u64, // how many tokens have fed into this EMA
-}
 
 // ── Simulated token state ──
 
@@ -69,6 +50,10 @@ pub struct SimToken {
     // Per-token overrides (from pattern or engine defaults)
     pub buy_amount_sol: f64,
     pub stop_loss_pct: f64,
+
+    // Trailing stop state
+    pub tp_trailing_active: bool,
+    pub tp_trailing_max_price: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -100,20 +85,14 @@ pub struct SimEngine {
     pub start_time: Instant,
     pub buy_amount_sol: f64,
     pub stop_loss_pct: f64,
-    pub real_tp_multiply: f64,
+    pub tp_trailing: f64,
+    pub trailing_stop: f64,
     pub confirmation_delay: Duration,
     pub match_count_per_pattern: Arc<Mutex<HashMap<String, u64>>>,
     pub total_tx_processed: Arc<Mutex<u64>>,
     // Fees
     pub buy_fee_sol: f64,
     pub sell_fee_sol: f64,
-    // EMA / AVERAGE mode
-    pub simulation_mode: String, // "STATIC", "EMA", or "AVERAGE"
-    pub ema_alpha: f64,
-    pub average_window: usize,
-    pub ema_state: Arc<Mutex<HashMap<String, PatternEmaState>>>,           // pattern_label -> EMA state
-    pub avg_history: Arc<Mutex<HashMap<String, VecDeque<f64>>>>,           // pattern_label -> recent peak multiples
-    ath_trackers: Arc<Mutex<HashMap<Pubkey, AthTracker>>>,                 // mint -> ATH tracker
 }
 
 impl SimEngine {
@@ -134,193 +113,14 @@ impl SimEngine {
             start_time: Instant::now(),
             buy_amount_sol: sim.buy_amount_sol,
             stop_loss_pct: sim.stop_loss / 100.0,
-            real_tp_multiply: sim.real_tp_multiply / 100.0,
+            tp_trailing: sim.tp_trailing,
+            trailing_stop: sim.trailing_stop,
             confirmation_delay: Duration::from_millis(sim.confirmation_delay_ms),
             match_count_per_pattern: Arc::new(Mutex::new(HashMap::new())),
             total_tx_processed: Arc::new(Mutex::new(0)),
             buy_fee_sol: landing_fee + buy_priority + base_tx_fee,
             sell_fee_sol: sell_priority + base_tx_fee,
-            simulation_mode: sim.simulation_mode.clone(),
-            ema_alpha: sim.ema_alpha.clamp(0.0, 1.0),
-            average_window: sim.average_window.max(1),
-            ema_state: Arc::new(Mutex::new(HashMap::new())),
-            avg_history: Arc::new(Mutex::new(HashMap::new())),
-            ath_trackers: Arc::new(Mutex::new(HashMap::new())),
         }
-    }
-
-    /// Check if running in adaptive mode (EMA or AVERAGE)
-    fn is_adaptive_mode(&self) -> bool {
-        self.simulation_mode == "EMA" || self.simulation_mode == "AVERAGE"
-    }
-
-    /// Get adaptive TP for a pattern (as percentage, e.g. 150.0 = 1.5x).
-    /// EMA mode: α × newest_peak + (1-α) × second_newest_peak from data series.
-    /// AVERAGE mode: average of recent N tokens' live ATH peaks.
-    fn get_adaptive_tp(&self, pattern_label: &str, initial_tp: f64) -> f64 {
-        let initial_mult = initial_tp / 100.0; // convert 150 → 1.5
-
-        // Collect active trackers' peak multiples for this pattern, sorted oldest-first
-        let trackers = self.ath_trackers.lock().expect("ath_trackers lock");
-        let mut active_peaks: Vec<(Instant, f64)> = trackers
-            .values()
-            .filter(|t| t.pattern_label == pattern_label && t.buy_price > 0.0)
-            .map(|t| (t.started_at, t.max_price / t.buy_price))
-            .collect();
-        active_peaks.sort_by_key(|(started, _)| *started);
-
-        match self.simulation_mode.as_str() {
-            "EMA" => {
-                let mut state = self.ema_state.lock().expect("ema_state lock");
-                let entry = state.entry(pattern_label.to_string()).or_insert(PatternEmaState {
-                    ema_tp: initial_mult,
-                    update_count: 0,
-                });
-                let finalized = entry.ema_tp;
-
-                // Build data series: [finalized, peak1, peak2, ...], use last two
-                let mut series: Vec<f64> = vec![finalized];
-                for (_, peak) in active_peaks.iter() {
-                    series.push(*peak);
-                }
-
-                let live_ema = if series.len() >= 2 {
-                    let newest = series[series.len() - 1];
-                    let second = series[series.len() - 2];
-                    self.ema_alpha * newest + (1.0 - self.ema_alpha) * second
-                } else {
-                    finalized
-                };
-
-                live_ema * 100.0
-            }
-            "AVERAGE" => {
-                let history = self.avg_history.lock().expect("avg_history lock");
-                let finalized = history.get(pattern_label);
-
-                // Combine finalized history + active peaks into one window
-                let mut all_peaks: Vec<f64> = match finalized {
-                    Some(q) => q.iter().copied().collect(),
-                    None => Vec::new(),
-                };
-                for (_, peak) in active_peaks.iter() {
-                    all_peaks.push(*peak);
-                }
-
-                if all_peaks.is_empty() {
-                    initial_tp // return as-is (percentage)
-                } else {
-                    // Take the most recent `window` entries
-                    let window = self.average_window;
-                    let start = if all_peaks.len() > window { all_peaks.len() - window } else { 0 };
-                    let recent = &all_peaks[start..];
-                    let avg = recent.iter().sum::<f64>() / recent.len() as f64;
-                    avg * 100.0
-                }
-            }
-            _ => initial_tp, // STATIC — shouldn't reach here
-        }
-    }
-
-    /// Update ATH for a token being tracked (called on every price update).
-    fn update_ath(&self, mint: &Pubkey, new_price: f64) {
-        if !self.is_adaptive_mode() {
-            return;
-        }
-        let mut trackers = self.ath_trackers.lock().expect("ath_trackers lock");
-        if let Some(tracker) = trackers.get_mut(mint) {
-            tracker.max_price = tracker.max_price.max(new_price);
-        }
-    }
-
-    /// Expire ATH trackers older than 1 hour — fold into EMA or average history.
-    fn expire_ath_trackers(&self) {
-        if !self.is_adaptive_mode() {
-            return;
-        }
-        let one_hour = Duration::from_secs(3600);
-        let mut trackers = self.ath_trackers.lock().expect("ath_trackers lock");
-        let expired: Vec<Pubkey> = trackers
-            .iter()
-            .filter(|(_, t)| t.started_at.elapsed() >= one_hour)
-            .map(|(k, _)| *k)
-            .collect();
-
-        if expired.is_empty() {
-            return;
-        }
-
-        match self.simulation_mode.as_str() {
-            "EMA" => {
-                let mut ema_state = self.ema_state.lock().expect("ema_state lock");
-                for mint in expired {
-                    if let Some(tracker) = trackers.remove(&mint) {
-                        if tracker.buy_price > 0.0 {
-                            let peak_multiple = tracker.max_price / tracker.buy_price;
-                            let entry = ema_state
-                                .entry(tracker.pattern_label.clone())
-                                .or_insert(PatternEmaState {
-                                    ema_tp: peak_multiple,
-                                    update_count: 0,
-                                });
-                            let old_ema = entry.ema_tp;
-                            entry.ema_tp = self.ema_alpha * peak_multiple + (1.0 - self.ema_alpha) * old_ema;
-                            entry.update_count += 1;
-                            info!(
-                                "\n📊 [SIM] [EMA_UPDATE]\n\
-                                 │  Pattern:      {}\n\
-                                 │  Mint:         {}\n\
-                                 │  Peak mult:    {:.3}x\n\
-                                 │  EMA:          {:.3}x → {:.3}x\n\
-                                 │  Updates:      {}\n\
-                                 └──────────────────────",
-                                tracker.pattern_label, tracker.mint,
-                                peak_multiple,
-                                old_ema, entry.ema_tp,
-                                entry.update_count,
-                            );
-                        }
-                    }
-                }
-            }
-            "AVERAGE" => {
-                let mut avg = self.avg_history.lock().expect("avg_history lock");
-                for mint in expired {
-                    if let Some(tracker) = trackers.remove(&mint) {
-                        if tracker.buy_price > 0.0 {
-                            let peak_multiple = tracker.max_price / tracker.buy_price;
-                            let q = avg.entry(tracker.pattern_label.clone()).or_insert_with(VecDeque::new);
-                            q.push_back(peak_multiple);
-                            while q.len() > self.average_window {
-                                q.pop_front();
-                            }
-                            let current_avg: f64 = q.iter().sum::<f64>() / q.len() as f64;
-                            info!(
-                                "\n📊 [SIM] [AVG_UPDATE]\n\
-                                 │  Pattern:      {}\n\
-                                 │  Mint:         {}\n\
-                                 │  Peak mult:    {:.3}x\n\
-                                 │  Window avg:   {:.3}x (n={})\n\
-                                 └──────────────────────",
-                                tracker.pattern_label, tracker.mint,
-                                peak_multiple,
-                                current_avg, q.len(),
-                            );
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// Get EMA state snapshot for reporting.
-    pub fn get_ema_state(&self) -> HashMap<String, PatternEmaState> {
-        self.ema_state.lock().expect("ema_state lock").clone()
-    }
-
-    pub fn get_avg_history(&self) -> HashMap<String, VecDeque<f64>> {
-        self.avg_history.lock().expect("avg_history lock").clone()
     }
 
     /// Process one transaction's parsed data (simulation equivalent of handle_trade_events)
@@ -352,9 +152,6 @@ impl SimEngine {
             let mut count = self.total_tx_processed.lock().expect("tx counter lock");
             *count += 1;
         }
-
-        // Expire ATH trackers older than 1 hour and update EMA
-        self.expire_ath_trackers();
 
         let (unit, price) = budget_compute_data;
         let (mint_contexts, buy_events, sell_events, _, _, _) = pumpfun_trade_data;
@@ -390,14 +187,6 @@ impl SimEngine {
                 let token_buy_sol = manual_pat.buy_amount_sol.unwrap_or(self.buy_amount_sol);
                 let token_sl_pct = manual_pat.stop_loss.map(|v| v / 100.0).unwrap_or(self.stop_loss_pct);
 
-                // In adaptive mode: override TP with computed value (single level, sell 100%)
-                let (ema_tp_levels, ema_sell_amounts) = if !needs_bundle && self.is_adaptive_mode() && !manual_pat.take_profit.is_empty() {
-                    let adaptive_tp = self.get_adaptive_tp(&manual_pat.label, manual_pat.take_profit[0]);
-                    (vec![adaptive_tp], vec![100.0])
-                } else {
-                    (manual_pat.take_profit.clone(), manual_pat.sell_amounts.clone())
-                };
-
                 let sim_token = SimToken {
                     mint,
                     pattern_label: manual_pat.label.clone(),
@@ -408,8 +197,8 @@ impl SimEngine {
                     current_price: initial_price,
                     max_price: initial_price,
                     exit_price: 0.0,
-                    tp_levels: if needs_bundle { Vec::new() } else { ema_tp_levels.clone() },
-                    sell_amounts: if needs_bundle { Vec::new() } else { ema_sell_amounts.clone() },
+                    tp_levels: if needs_bundle { Vec::new() } else { manual_pat.take_profit.clone() },
+                    sell_amounts: if needs_bundle { Vec::new() } else { manual_pat.sell_amounts.clone() },
                     next_tp_index: 0,
                     sl_triggered: false,
                     tp_triggered_at: Vec::new(),
@@ -427,6 +216,8 @@ impl SimEngine {
                     sell_count: 0,
                     buy_amount_sol: token_buy_sol,
                     stop_loss_pct: token_sl_pct,
+                    tp_trailing_active: false,
+                    tp_trailing_max_price: 0.0,
                 };
 
                 let mut tokens = self.tokens.lock().expect("tokens lock");
@@ -455,15 +246,13 @@ impl SimEngine {
                         mc,
                         token_buy_sol,
                         token_sl_pct * 100.0,
-                        ema_tp_levels, ema_sell_amounts,
+                        manual_pat.take_profit, manual_pat.sell_amounts,
                     );
 
                     // Spawn guaranteed buy confirmation after delay
                     let tokens_arc = self.tokens.clone();
                     let delay = self.confirmation_delay;
                     let buy_fee = self.buy_fee_sol;
-                    let ath_arc = self.ath_trackers.clone();
-                    let is_adaptive = self.is_adaptive_mode();
                     tokio::spawn(async move {
                     tokio::time::sleep(delay).await;
                     let mut tokens = tokens_arc.lock().expect("tokens lock");
@@ -472,17 +261,6 @@ impl SimEngine {
                             sim.buy_confirmed = true;
                             sim.buy_price = sim.current_price;
                             sim.total_fees_sol += buy_fee;
-                            // Start ATH tracker in adaptive mode
-                            if is_adaptive {
-                                let mut trackers = ath_arc.lock().expect("ath_trackers lock");
-                                trackers.insert(mint, AthTracker {
-                                    mint,
-                                    pattern_label: sim.pattern_label.clone(),
-                                    buy_price: sim.buy_price,
-                                    max_price: sim.current_price,
-                                    started_at: Instant::now(),
-                                });
-                            }
                             let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                             let mint_mc = sim.mint_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                             let price_change = ((sim.current_price / sim.mint_price) - 1.0) * 100.0;
@@ -539,6 +317,8 @@ impl SimEngine {
                     sell_count: 0,
                     buy_amount_sol: self.buy_amount_sol,
                     stop_loss_pct: self.stop_loss_pct,
+                    tp_trailing_active: false,
+                    tp_trailing_max_price: 0.0,
                 };
 
                 let mut tokens = self.tokens.lock().expect("tokens lock");
@@ -553,11 +333,6 @@ impl SimEngine {
 
         for buy_event in buy_events.iter() {
             let mint = buy_event.mint;
-
-            // Update ATH tracker regardless of active token status
-            let new_price_for_ath = (buy_event.virtual_sol_reserves as f64 / 1e9)
-                / (buy_event.virtual_token_reserves as f64 / 1e6);
-            self.update_ath(&mint, new_price_for_ath);
 
             if let Some(sim) = tokens.get_mut(&mint) {
                 let new_price = (buy_event.virtual_sol_reserves as f64 / 1e9)
@@ -604,19 +379,12 @@ impl SimEngine {
                 }
 
                 if let Some(pattern) = matched_pattern {
-                    // In EMA mode: override TP with current EMA value
                     let server_label = format!(
                         "SERVER_BUNDLE({},{},len={})",
                         mint_pat.0, mint_pat.1, pattern.buy_pattern.len()
                     );
-                    if self.is_adaptive_mode() && !pattern.tp_threshold.is_empty() {
-                        let adaptive_tp = self.get_adaptive_tp(&server_label, pattern.tp_threshold[0]);
-                        sim.tp_levels = vec![adaptive_tp];
-                        sim.sell_amounts = vec![100.0];
-                    } else {
-                        sim.tp_levels = pattern.tp_threshold.clone();
-                        sim.sell_amounts = pattern.sell_amounts.clone();
-                    }
+                    sim.tp_levels = pattern.tp_threshold.clone();
+                    sim.sell_amounts = pattern.sell_amounts.clone();
                     sim.matched_at = Instant::now(); // reset for confirmation delay
                     sim.pattern_label = server_label;
 
@@ -651,8 +419,6 @@ impl SimEngine {
                     let delay = self.confirmation_delay;
                     let buy_fee = self.buy_fee_sol;
                     let mint_key = *mint;
-                    let ath_arc2 = self.ath_trackers.clone();
-                    let is_adaptive2 = self.is_adaptive_mode();
                     tokio::spawn(async move {
                         tokio::time::sleep(delay).await;
                         let mut tokens = tokens_arc.lock().expect("tokens lock");
@@ -661,16 +427,6 @@ impl SimEngine {
                                 sim.buy_confirmed = true;
                                 sim.buy_price = sim.current_price;
                                 sim.total_fees_sol += buy_fee;
-                                if is_adaptive2 {
-                                    let mut trackers = ath_arc2.lock().expect("ath_trackers lock");
-                                    trackers.insert(mint_key, AthTracker {
-                                        mint: mint_key,
-                                        pattern_label: sim.pattern_label.clone(),
-                                        buy_price: sim.buy_price,
-                                        max_price: sim.current_price,
-                                        started_at: Instant::now(),
-                                    });
-                                }
                                 let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                                 let mint_mc = sim.mint_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                                 let price_change = ((sim.current_price / sim.mint_price) - 1.0) * 100.0;
@@ -700,15 +456,8 @@ impl SimEngine {
                 // Check pending manual pattern bundle buy CU
                 if let Some(manual_pat) = sim.pending_manual_pattern.clone() {
                     if sim.tp_levels.is_empty() && manual_pat.matches_bundle_buy_cu(unit, price) {
-                        // In adaptive mode: override TP with computed value
-                        if self.is_adaptive_mode() && !manual_pat.take_profit.is_empty() {
-                            let adaptive_tp = self.get_adaptive_tp(&manual_pat.label, manual_pat.take_profit[0]);
-                            sim.tp_levels = vec![adaptive_tp];
-                            sim.sell_amounts = vec![100.0];
-                        } else {
-                            sim.tp_levels = manual_pat.take_profit.clone();
-                            sim.sell_amounts = manual_pat.sell_amounts.clone();
-                        }
+                        sim.tp_levels = manual_pat.take_profit.clone();
+                        sim.sell_amounts = manual_pat.sell_amounts.clone();
                         if let Some(pat_buy) = manual_pat.buy_amount_sol {
                             sim.buy_amount_sol = pat_buy;
                         }
@@ -745,8 +494,6 @@ impl SimEngine {
                         let delay = self.confirmation_delay;
                         let buy_fee = self.buy_fee_sol;
                         let mint_key = *mint;
-                        let ath_arc3 = self.ath_trackers.clone();
-                        let is_adaptive3 = self.is_adaptive_mode();
                         tokio::spawn(async move {
                             tokio::time::sleep(delay).await;
                             let mut tokens = tokens_arc.lock().expect("tokens lock");
@@ -755,16 +502,6 @@ impl SimEngine {
                                     sim.buy_confirmed = true;
                                     sim.buy_price = sim.current_price;
                                     sim.total_fees_sol += buy_fee;
-                                    if is_adaptive3 {
-                                        let mut trackers = ath_arc3.lock().expect("ath_trackers lock");
-                                        trackers.insert(mint_key, AthTracker {
-                                            mint: mint_key,
-                                            pattern_label: sim.pattern_label.clone(),
-                                            buy_price: sim.buy_price,
-                                            max_price: sim.current_price,
-                                            started_at: Instant::now(),
-                                        });
-                                    }
                                     let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                                     let mint_mc = sim.mint_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
                                     let price_change = ((sim.current_price / sim.mint_price) - 1.0) * 100.0;
@@ -798,7 +535,6 @@ impl SimEngine {
         for sell_event in sell_events.iter() {
             let sell_new_price = (sell_event.virtual_sol_reserves as f64 / 1e9)
                 / (sell_event.virtual_token_reserves as f64 / 1e6);
-            self.update_ath(&sell_event.mint, sell_new_price);
 
             if let Some(sim) = tokens.get_mut(&sell_event.mint) {
                 sim.current_price = sell_new_price;
@@ -834,7 +570,6 @@ impl SimEngine {
             let mint = pumpswap_buy_accs[i].base_mint;
             let ps_new_price = (ps_buy.pool_quote_token_reserves as f64 / 1e9)
                 / (ps_buy.pool_base_token_reserves as f64 / 1e6);
-            self.update_ath(&mint, ps_new_price);
 
             if let Some(sim) = tokens.get_mut(&mint) {
                 sim.current_price = ps_new_price;
@@ -851,7 +586,6 @@ impl SimEngine {
             let mint = pumpswap_sell_accs[i].base_mint;
             let ps_sell_price = (ps_sell.pool_quote_token_reserves as f64 / 1e9)
                 / (ps_sell.pool_base_token_reserves as f64 / 1e6);
-            self.update_ath(&mint, ps_sell_price);
 
             if let Some(sim) = tokens.get_mut(&mint) {
                 sim.current_price = ps_sell_price;
@@ -936,69 +670,93 @@ impl SimEngine {
             return;
         }
 
-        // ── Take Profit check ──
+        // ── Trailing TP check ──
+        if sim.tp_trailing_active {
+            sim.tp_trailing_max_price = sim.tp_trailing_max_price.max(sim.current_price);
+        }
+
         if sim.next_tp_index < sim.tp_levels.len() {
             let tp_pct = sim.tp_levels[sim.next_tp_index];
-            let threshold = tp_pct / 100.0 * self.real_tp_multiply;
+            let tp_multiplier = tp_pct / 100.0;
+            let trailing_trigger = tp_multiplier * self.tp_trailing;
 
-            if sim.current_price > sim.buy_price * threshold {
-                let sell_pct = sim.sell_amounts[sim.next_tp_index];
-                sim.tp_triggered_at.push(sim.current_price);
-                sim.total_sold_pct += sell_pct;
-                sim.next_tp_index += 1;
-                sim.sell_count += 1;
-                sim.total_fees_sol += self.sell_fee_sol;
+            // Activate trailing when price reaches tp * tp_trailing
+            if !sim.tp_trailing_active
+                && sim.current_price >= sim.buy_price * trailing_trigger
+            {
+                sim.tp_trailing_active = true;
+                sim.tp_trailing_max_price = sim.current_price;
+            }
 
-                let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
-                let buy_mc = sim.buy_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
-                let price_mult = sim.current_price / sim.buy_price;
-                let this_tp_pnl_pct = (price_mult - 1.0) * 100.0;
-                let this_tp_sol = sim.buy_amount_sol * (sell_pct / 100.0) * price_mult;
-                info!(
-                    "\n🟢 [SIM] [SELL] [TP{}]\n\
-                     │  Pattern:    {}\n\
-                     │  Mint:       {}\n\
-                     │  Buy MC:     {:.2} SOL\n\
-                     │  Sell MC:    {:.2} SOL  ({:.2}x)\n\
-                     │  This TP:    {:.0}% sold → {:.6} SOL return\n\
-                     │  Price PnL:  {:+.2}%\n\
-                     │  Total Sold: {:.0}%\n\
-                     └──────────────────────",
-                    sim.next_tp_index,
-                    sim.pattern_label, sim.mint,
-                    buy_mc, mc, price_mult,
-                    sell_pct, this_tp_sol,
-                    this_tp_pnl_pct,
-                    sim.total_sold_pct,
-                );
+            // Check sell conditions while trailing is active
+            if sim.tp_trailing_active {
+                let reached_tp = sim.current_price >= sim.buy_price * tp_multiplier;
+                let trailing_stop_hit = sim.current_price <= sim.tp_trailing_max_price * self.trailing_stop;
 
-                // All TPs hit → close position
-                if sim.next_tp_index >= sim.tp_levels.len() || sim.total_sold_pct >= 100.0 {
-                    sim.exit_price = sim.current_price;
-                    let pnl: f64 = sim
-                        .tp_triggered_at
-                        .iter()
-                        .zip(sim.sell_amounts.iter())
-                        .map(|(tp_price, sell_pct)| sell_pct * (tp_price / sim.buy_price - 1.0))
-                        .sum();
-                    let fee_pct = (sim.total_fees_sol / sim.buy_amount_sol) * 100.0;
-                    sim.pnl_pct = pnl / 100.0 * 100.0 - fee_pct;
-                    sim.outcome = SimOutcome::TpHit;
-                    sim.exit_reason = format!(
-                        "All TPs hit | final MC: {:.2} SOL | PnL: {:.2}%",
-                        sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64, sim.pnl_pct
-                    );
+                if reached_tp || trailing_stop_hit {
+                    let sell_pct = sim.sell_amounts[sim.next_tp_index];
+                    sim.tp_triggered_at.push(sim.current_price);
+                    sim.total_sold_pct += sell_pct;
+                    sim.next_tp_index += 1;
+                    sim.sell_count += 1;
+                    sim.total_fees_sol += self.sell_fee_sol;
+                    sim.tp_trailing_active = false;
 
-                    let sol_pnl = sim.buy_amount_sol * sim.pnl_pct / 100.0;
+                    let mc = sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
+                    let buy_mc = sim.buy_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64;
+                    let price_mult = sim.current_price / sim.buy_price;
+                    let this_tp_pnl_pct = (price_mult - 1.0) * 100.0;
+                    let this_tp_sol = sim.buy_amount_sol * (sell_pct / 100.0) * price_mult;
+                    let reason = if reached_tp { "TP_HIT" } else { "TRAILING_STOP" };
                     info!(
-                        "\n✅ [SIM] [CLOSED] All TPs hit\n\
+                        "\n🟢 [SIM] [SELL] [TP{}] [{}]\n\
                          │  Pattern:    {}\n\
                          │  Mint:       {}\n\
-                         │  Net PnL:    {:.2}% ({:+.6} SOL)\n\
+                         │  Buy MC:     {:.2} SOL\n\
+                         │  Sell MC:    {:.2} SOL  ({:.2}x)\n\
+                         │  Max Price:  {:.2}x\n\
+                         │  This TP:    {:.0}% sold → {:.6} SOL return\n\
+                         │  Price PnL:  {:+.2}%\n\
+                         │  Total Sold: {:.0}%\n\
                          └──────────────────────",
+                        sim.next_tp_index,
+                        reason,
                         sim.pattern_label, sim.mint,
-                        sim.pnl_pct, sol_pnl,
+                        buy_mc, mc, price_mult,
+                        sim.tp_trailing_max_price / sim.buy_price,
+                        sell_pct, this_tp_sol,
+                        this_tp_pnl_pct,
+                        sim.total_sold_pct,
                     );
+
+                    // All TPs hit → close position
+                    if sim.next_tp_index >= sim.tp_levels.len() || sim.total_sold_pct >= 100.0 {
+                        sim.exit_price = sim.current_price;
+                        let pnl: f64 = sim
+                            .tp_triggered_at
+                            .iter()
+                            .zip(sim.sell_amounts.iter())
+                            .map(|(tp_price, sell_pct)| sell_pct * (tp_price / sim.buy_price - 1.0))
+                            .sum();
+                        let fee_pct = (sim.total_fees_sol / sim.buy_amount_sol) * 100.0;
+                        sim.pnl_pct = pnl / 100.0 * 100.0 - fee_pct;
+                        sim.outcome = SimOutcome::TpHit;
+                        sim.exit_reason = format!(
+                            "All TPs hit | final MC: {:.2} SOL | PnL: {:.2}%",
+                            sim.current_price * PUMP_FUN_TOKEN_TOTAL_SUPPLY as f64, sim.pnl_pct
+                        );
+
+                        let sol_pnl = sim.buy_amount_sol * sim.pnl_pct / 100.0;
+                        info!(
+                            "\n✅ [SIM] [CLOSED] All TPs hit\n\
+                             │  Pattern:    {}\n\
+                             │  Mint:       {}\n\
+                             │  Net PnL:    {:.2}% ({:+.6} SOL)\n\
+                             └──────────────────────",
+                            sim.pattern_label, sim.mint,
+                            sim.pnl_pct, sol_pnl,
+                        );
+                    }
                 }
             }
         }
@@ -1006,47 +764,6 @@ impl SimEngine {
 
     /// Finalize all pending tokens (called when simulation ends)
     pub fn finalize(&self) {
-        // Drain all remaining ATH trackers into finalized state
-        if self.is_adaptive_mode() {
-            let mut trackers = self.ath_trackers.lock().expect("ath_trackers lock");
-            // Sort by age (oldest first) so updates are applied in chronological order
-            let mut entries: Vec<_> = trackers.drain().collect();
-            entries.sort_by_key(|(_, t)| t.started_at);
-
-            match self.simulation_mode.as_str() {
-                "EMA" => {
-                    let mut ema_state = self.ema_state.lock().expect("ema_state lock");
-                    for (_, tracker) in entries {
-                        if tracker.buy_price > 0.0 {
-                            let peak_multiple = tracker.max_price / tracker.buy_price;
-                            let entry = ema_state
-                                .entry(tracker.pattern_label.clone())
-                                .or_insert(PatternEmaState {
-                                    ema_tp: peak_multiple,
-                                    update_count: 0,
-                                });
-                            entry.ema_tp = self.ema_alpha * peak_multiple + (1.0 - self.ema_alpha) * entry.ema_tp;
-                            entry.update_count += 1;
-                        }
-                    }
-                }
-                "AVERAGE" => {
-                    let mut avg = self.avg_history.lock().expect("avg_history lock");
-                    for (_, tracker) in entries {
-                        if tracker.buy_price > 0.0 {
-                            let peak_multiple = tracker.max_price / tracker.buy_price;
-                            let q = avg.entry(tracker.pattern_label.clone()).or_insert_with(VecDeque::new);
-                            q.push_back(peak_multiple);
-                            while q.len() > self.average_window {
-                                q.pop_front();
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-
         let mut tokens = self.tokens.lock().expect("tokens lock");
         let mut completed = self.completed.lock().expect("completed lock");
 

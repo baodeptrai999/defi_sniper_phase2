@@ -110,12 +110,12 @@ pub fn get_raw_manual_patterns() -> Vec<ManualPatternRaw> {
             bundle_buy_cu_limit: Some("140000".to_string()),
             bundle_buy_cu_price: Some("320000".to_string()),
             stop_loss: None,
-            take_profit: vec![235.0],
-            sell_amounts: Some(vec![100.0]),
+            take_profit: vec![140.0, 180.0],
+            sell_amounts: Some(vec![60.0, 40.0]),
             token_version: Some("V2".to_string()),
             alt_addresses: None,
             mint_tx_version: None,
-            buy_amount_sol: Some(0.05),
+            buy_amount_sol: Some(0.03),
         },
 
         ManualPatternRaw {

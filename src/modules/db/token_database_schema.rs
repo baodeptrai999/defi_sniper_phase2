@@ -34,6 +34,8 @@ pub struct TokenDatabaseSchema {
     pub override_buy_amount_sol: Option<f64>,
     pub override_stop_loss: Option<f64>,
     pub matched_pattern_label: String,
+    pub tp_trailing_active: bool,
+    pub tp_trailing_max_price: f64,
 }
 
 impl TokenDatabaseSchema {
@@ -77,6 +79,8 @@ impl TokenDatabaseSchema {
             override_buy_amount_sol: None,
             override_stop_loss: None,
             matched_pattern_label: String::new(),
+            tp_trailing_active: false,
+            tp_trailing_max_price: 0.0,
         };
 
         let _ = TOKEN_DB.upsert(mint_event.mint.clone(), token_data.clone());
@@ -101,35 +105,67 @@ impl TokenDatabaseSchema {
             self.sl_state = SLMode::Triggered;
         }
 
+        // Update trailing max price if trailing is active
+        if self.tp_trailing_active {
+            self.tp_trailing_max_price = self.tp_trailing_max_price.max(self.token_price);
+        }
+
         if self.pending_tp_sell_index.is_none() {
             if let Some((tp_idx, threshold_pct)) = self
                 .token_tp_levels
                 .get(self.next_tp_index_to_sell)
                 .map(|v| (self.next_tp_index_to_sell, *v))
             {
-                let threshold_multiplier = threshold_pct / 100.0 * *REAL_TP_MULTIPLY;
+                let tp_multiplier = threshold_pct / 100.0;
+                let trailing_trigger = tp_multiplier * *TP_TRAILING;
 
-                if self.token_price > self.token_buying_point_price * threshold_multiplier {
-                    let planned_amount = self
-                        .token_sell_plan_amounts
-                        .get(tp_idx)
-                        .copied()
-                        .unwrap_or(0)
-                        .min(self.token_balance);
+                // Activate trailing when price reaches tp * tp_trailing
+                if !self.tp_trailing_active
+                    && self.token_price >= self.token_buying_point_price * trailing_trigger
+                {
+                    self.tp_trailing_active = true;
+                    self.tp_trailing_max_price = self.token_price;
+                    update!(
+                        "[TP{}_TRAILING]\t*MINT: {}\n\t*TRIGGER: {:.2}x\n\t*PRICE: {:.10}",
+                        tp_idx + 1,
+                        self.pumpfun_struct.mint,
+                        trailing_trigger,
+                        self.token_price,
+                    );
+                }
 
-                    if planned_amount > 0 {
-                        self.pending_tp_sell_index = Some(tp_idx);
-                        self.pending_tp_sell_amount = planned_amount;
+                // Check sell conditions while trailing is active
+                if self.tp_trailing_active {
+                    let reached_tp = self.token_price >= self.token_buying_point_price * tp_multiplier;
+                    let trailing_stop_hit = self.token_price <= self.tp_trailing_max_price * *TRAILING_STOP;
 
-                        update!(
-                            "[TP{}_REACHED]\t*MINT: {}\n\t*TARGET: {}%\n\t*SELL_AMOUNT: {}",
-                            tp_idx + 1,
-                            self.pumpfun_struct.mint,
-                            threshold_pct,
-                            planned_amount,
-                        );
-                    } else {
-                        self.next_tp_index_to_sell += 1;
+                    if reached_tp || trailing_stop_hit {
+                        let planned_amount = self
+                            .token_sell_plan_amounts
+                            .get(tp_idx)
+                            .copied()
+                            .unwrap_or(0)
+                            .min(self.token_balance);
+
+                        if planned_amount > 0 {
+                            self.pending_tp_sell_index = Some(tp_idx);
+                            self.pending_tp_sell_amount = planned_amount;
+                            self.tp_trailing_active = false;
+
+                            let reason = if reached_tp { "TP_HIT" } else { "TRAILING_STOP" };
+                            update!(
+                                "[TP{}_{}]\t*MINT: {}\n\t*TARGET: {}%\n\t*SELL_AMOUNT: {}\n\t*MAX_PRICE: {:.10}",
+                                tp_idx + 1,
+                                reason,
+                                self.pumpfun_struct.mint,
+                                threshold_pct,
+                                planned_amount,
+                                self.tp_trailing_max_price,
+                            );
+                        } else {
+                            self.next_tp_index_to_sell += 1;
+                            self.tp_trailing_active = false;
+                        }
                     }
                 }
             }
@@ -143,6 +179,8 @@ impl TokenDatabaseSchema {
         self.next_tp_index_to_sell = 0;
         self.pending_tp_sell_index = None;
         self.pending_tp_sell_amount = 0;
+        self.tp_trailing_active = false;
+        self.tp_trailing_max_price = 0.0;
         self.initialize_sell_plan_if_needed();
     }
 

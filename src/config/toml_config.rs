@@ -28,30 +28,14 @@ pub struct BuySetting {
     pub loss_multiply: f64,
     pub profit_multiply: f64,
     pub max_buy_amount_multiply: f64,
+    pub min_buy_amount_multiply: f64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SellSetting {
     pub stop_loss: f64,
-    pub real_tp_multiply: f64,
-    pub tp_mode: String,
-    pub ema_alpha: f64,
-    pub average_window: usize,
-    pub trailing_1: f64,
-    pub trailing_1_stop: f64,
-    pub trailing_1_sell_percentage: f64,
-    pub trailing_2: f64,
-    pub trailing_2_stop: f64,
-    pub trailing_2_sell_percentage: f64,
-    pub trailing_3: f64,
-    pub trailing_3_stop: f64,
-    pub trailing_3_sell_percentage: f64,
-    pub trailing_4: f64,
-    pub trailing_4_stop: f64,
-    pub trailing_4_sell_percentage: f64,
-    pub trailing_5: f64,
-    pub trailing_5_stop: f64,
-    pub trailing_5_sell_percentage: f64,
+    pub tp_trailing: f64,
+    pub trailing_stop: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -77,12 +61,10 @@ pub struct FeeConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct SimulationSetting {
-    pub simulation_mode: String,
-    pub ema_alpha: f64,
-    pub average_window: usize,
     pub buy_amount_sol: f64,
     pub stop_loss: f64,
-    pub real_tp_multiply: f64,
+    pub tp_trailing: f64,
+    pub trailing_stop: f64,
     pub confirmation_delay_ms: u64,
     pub landing_service: String,
     pub buy_compute_unit_limit: u64,

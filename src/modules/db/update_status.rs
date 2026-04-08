@@ -11,7 +11,6 @@ pub fn update_status_from_pumpfun_buy_event(
     token_data.token_max_price = token_data.token_max_price.max(updated_token_price);
     token_data.token_price = updated_token_price;
     token_data.token_creator = buy_event.creator;
-    ADAPTIVE_TP.update_ath(&buy_event.mint, updated_token_price);
 
     if buy_event.user == *SIGNER_PUBKEY {
         info!(
@@ -25,12 +24,6 @@ pub fn update_status_from_pumpfun_buy_event(
         token_data.token_buying_point_price = updated_token_price;
         token_data.token_sell_status = TokenSellStatus::None;
         token_data.initialize_sell_plan_if_needed();
-        ADAPTIVE_TP.start_tracking(
-            buy_event.mint,
-            token_data.matched_pattern_label.clone(),
-            updated_token_price,
-            updated_token_price,
-        );
     } else if buy_event.user == token_data.token_creator {
         if token_data.dev_buy_sol_lamports == None {
             token_data.dev_buy_sol_lamports = Some(buy_event.sol_amount);
@@ -55,7 +48,6 @@ pub fn update_status_from_pumpfun_sell_event(
     token_data.token_max_price = token_data.token_max_price.max(updated_token_price);
     token_data.token_price = updated_token_price;
     token_data.token_creator = sell_event.creator;
-    ADAPTIVE_TP.update_ath(&sell_event.mint, updated_token_price);
 
     //update sell state flag
     token_data.update_sell_state_flag(tx_id.clone());
@@ -71,6 +63,8 @@ pub fn update_status_from_pumpfun_sell_event(
         token_data.token_sell_status = TokenSellStatus::None;
         token_data.pending_tp_sell_index = None;
         token_data.pending_tp_sell_amount = 0;
+        token_data.tp_trailing_active = false;
+        token_data.tp_trailing_max_price = 0.0;
 
         if token_data.token_balance > 0 {
             token_data.next_tp_index_to_sell = token_data.next_tp_index_to_sell.saturating_add(1);
@@ -104,7 +98,6 @@ pub fn update_status_from_migration_event(
     token_data.token_max_price = token_data.token_max_price.max(updated_token_price);
     token_data.token_is_migrated = true;
     token_data.token_creator = create_pool_event_data.coin_creator;
-    ADAPTIVE_TP.update_ath(&token_data.token_mint, updated_token_price);
 
     token_data.pumpswap_struct = Some(PumpSwapStruct::from_migrate(
         &create_pool_accounts,
@@ -131,7 +124,6 @@ pub fn update_status_from_pumpswap_buy_event(
 
     token_data.token_creator = buy_event.coin_creator;
     token_data.token_price = updated_token_price;
-    ADAPTIVE_TP.update_ath(&token_data.token_mint, updated_token_price);
 
     token_data.update_sell_state_flag(tx_id.clone());
 
@@ -148,12 +140,6 @@ pub fn update_status_from_pumpswap_buy_event(
         token_data.token_balance += buy_event.base_amount_out;
         token_data.token_sell_status = TokenSellStatus::None;
         token_data.initialize_sell_plan_if_needed();
-        ADAPTIVE_TP.start_tracking(
-            token_data.token_mint,
-            token_data.matched_pattern_label.clone(),
-            updated_token_price,
-            updated_token_price,
-        );
     }
 
     let _ = TOKEN_DB.upsert(token_data.token_mint.clone(), token_data.clone());
@@ -171,7 +157,6 @@ pub fn update_status_from_pumpswap_sell_event(
 
     token_data.token_creator = sell_event.coin_creator;
     token_data.token_price = updated_token_price;
-    ADAPTIVE_TP.update_ath(&token_data.token_mint, updated_token_price);
 
     token_data.update_sell_state_flag(tx_id.clone());
 
@@ -187,6 +172,8 @@ pub fn update_status_from_pumpswap_sell_event(
         token_data.token_sell_status = TokenSellStatus::None;
         token_data.pending_tp_sell_index = None;
         token_data.pending_tp_sell_amount = 0;
+        token_data.tp_trailing_active = false;
+        token_data.tp_trailing_max_price = 0.0;
 
         if token_data.token_balance > 0 {
             token_data.next_tp_index_to_sell = token_data.next_tp_index_to_sell.saturating_add(1);

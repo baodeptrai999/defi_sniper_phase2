@@ -79,7 +79,7 @@ impl DynamicBuyTracker {
     }
 
     /// Get the adjusted buy amount for a specific pattern.
-    /// Caps at `initial_buy_sol * MAX_BUY_AMOUNT_MULTIPLY`.
+    /// Caps between `initial_buy_sol * MIN_BUY_AMOUNT_MULTIPLY` and `initial_buy_sol * MAX_BUY_AMOUNT_MULTIPLY`.
     pub fn adjusted_buy_amount(&self, pattern_label: &str, initial_buy_sol: f64) -> f64 {
         if !*DYNAMIC_BUY_AMOUNT_MODE || pattern_label.is_empty() {
             return initial_buy_sol;
@@ -88,6 +88,7 @@ impl DynamicBuyTracker {
         let states = self.states.lock().expect("dynamic_buy lock");
         let multiplier = states.get(pattern_label).map(|s| s.multiplier).unwrap_or(1.0);
         let max = initial_buy_sol * *MAX_BUY_AMOUNT_MULTIPLY;
-        (initial_buy_sol * multiplier).min(max)
+        let min = initial_buy_sol * *MIN_BUY_AMOUNT_MULTIPLY;
+        (initial_buy_sol * multiplier).clamp(min, max)
     }
 }
