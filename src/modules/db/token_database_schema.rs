@@ -33,6 +33,7 @@ pub struct TokenDatabaseSchema {
     pub is_cashback_enabled: bool,
     pub override_buy_amount_sol: Option<f64>,
     pub override_stop_loss: Option<f64>,
+    pub matched_pattern_label: String,
 }
 
 impl TokenDatabaseSchema {
@@ -75,6 +76,7 @@ impl TokenDatabaseSchema {
             is_cashback_enabled: mint_event.is_cashback_enabled,
             override_buy_amount_sol: None,
             override_stop_loss: None,
+            matched_pattern_label: String::new(),
         };
 
         let _ = TOKEN_DB.upsert(mint_event.mint.clone(), token_data.clone());

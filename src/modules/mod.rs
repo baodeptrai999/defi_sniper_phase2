@@ -9,6 +9,7 @@ pub mod idl;
 pub mod backtesting;
 pub mod check_endpoints;
 pub mod rotate_wallet;
+pub mod protection_logic;
 
 pub use macros::*;
 pub use files::*;
@@ -21,3 +22,4 @@ pub use idl::*;
 pub use backtesting::*;
 pub use check_endpoints::*;
 pub use rotate_wallet::*;
+pub use protection_logic::*;

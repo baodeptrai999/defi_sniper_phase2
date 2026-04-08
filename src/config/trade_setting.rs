@@ -4,6 +4,10 @@ use once_cell::sync::Lazy;
 pub static STOP_LOSS: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.stop_loss / 100.0);
 pub static REAL_TP_MULTIPLY: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.real_tp_multiply / 100.0);
 
+pub static TP_MODE: Lazy<String> = Lazy::new(|| CONFIG.sell_setting.tp_mode.clone());
+pub static EMA_ALPHA: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.ema_alpha.clamp(0.0, 1.0));
+pub static AVERAGE_WINDOW: Lazy<usize> = Lazy::new(|| CONFIG.sell_setting.average_window.max(1));
+
 pub static TS_1: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.trailing_1 / 100.0);
 pub static TS_2: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.trailing_2 / 100.0);
 pub static TS_3: Lazy<f64> = Lazy::new(|| CONFIG.sell_setting.trailing_3 / 100.0);

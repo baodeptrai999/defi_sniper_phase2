@@ -28,6 +28,29 @@ async fn main() {
     let manual_count = get_manual_patterns().len();
     info!("Loaded {} manual pattern(s)", manual_count);
 
+    // Show adaptive TP mode info
+    info!("TP Mode: {}", *TP_MODE);
+    if *TP_MODE == "EMA" {
+        info!("EMA Alpha: {} (ATH tracked for 1h per token)", *EMA_ALPHA);
+    } else if *TP_MODE == "AVERAGE" {
+        info!("Average Window: {} tokens (ATH tracked for 1h per token)", *AVERAGE_WINDOW);
+    }
+
+    // Show dynamic buy amount mode
+    if *DYNAMIC_BUY_AMOUNT_MODE {
+        info!("Dynamic Buy Amount: ENABLED (3 losses → 2/3x, 2 wins → 2x, max = initial)");
+    }
+
+    // Spawn background ATH tracker expiry loop (every 60 seconds)
+    if AdaptiveTpEngine::is_adaptive() {
+        tokio::spawn(async {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                ADAPTIVE_TP.expire_trackers();
+            }
+        });
+    }
+
     tokio::spawn(async {
         run_pattern_server(PATTERN_SERVER_PORT).await;
     });

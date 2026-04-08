@@ -88,6 +88,12 @@ pub fn generate_report(engine: &SimEngine) -> String {
 
     report.push_str(&format!("  Runtime:              {} min {} sec\n", elapsed_min, elapsed_sec));
     report.push_str(&format!("  Transactions:         {}\n", total_tx));
+    report.push_str(&format!("  Simulation Mode:      {}\n", engine.simulation_mode));
+    if engine.simulation_mode == "EMA" {
+        report.push_str(&format!("  EMA Alpha:            {}\n", engine.ema_alpha));
+    } else if engine.simulation_mode == "AVERAGE" {
+        report.push_str(&format!("  Average Window:       {}\n", engine.average_window));
+    }
     report.push_str(&format!("  Buy Amount (default): {} SOL\n", default_buy_sol));
     report.push_str(&format!("  Buy Fee:              {:.6} SOL\n", engine.buy_fee_sol));
     report.push_str(&format!("  Sell Fee:             {:.6} SOL\n\n", engine.sell_fee_sol));
@@ -191,6 +197,60 @@ pub fn generate_report(engine: &SimEngine) -> String {
             tp_count, sl_count, partial_count, timeout_count
         ));
         report.push_str("  └──\n\n");
+    }
+
+    // ── EMA State (only in EMA mode) ──
+    if engine.simulation_mode == "EMA" {
+        let ema_state = engine.get_ema_state();
+        if !ema_state.is_empty() {
+            report.push_str(&format!("{}\n", thin));
+            report.push_str("  EMA STATE PER PATTERN\n");
+            report.push_str(&format!("{}\n\n", thin));
+
+            let mut ema_sorted: Vec<_> = ema_state.into_iter().collect();
+            ema_sorted.sort_by_key(|(label, _)| label.clone());
+
+            for (label, state) in ema_sorted.iter() {
+                report.push_str(&format!(
+                    "  ┌── {} ──\n\
+                     │  Current EMA TP:  {:.3}x ({:.1}%)\n\
+                     │  Updates:         {}\n\
+                     └──\n\n",
+                    label,
+                    state.ema_tp, state.ema_tp * 100.0,
+                    state.update_count,
+                ));
+            }
+        }
+    }
+
+    // ── Average State (only in AVERAGE mode) ──
+    if engine.simulation_mode == "AVERAGE" {
+        let avg_history = engine.get_avg_history();
+        if !avg_history.is_empty() {
+            report.push_str(&format!("{}\n", thin));
+            report.push_str("  AVERAGE STATE PER PATTERN\n");
+            report.push_str(&format!("{}\n\n", thin));
+
+            let mut avg_sorted: Vec<_> = avg_history.into_iter().collect();
+            avg_sorted.sort_by_key(|(label, _)| label.clone());
+
+            for (label, peaks) in avg_sorted.iter() {
+                let avg = if peaks.is_empty() { 0.0 } else { peaks.iter().sum::<f64>() / peaks.len() as f64 };
+                let peaks_str: Vec<String> = peaks.iter().map(|p| format!("{:.3}x", p)).collect();
+                report.push_str(&format!(
+                    "  ┌── {} ──\n\
+                     │  Current Avg TP:  {:.3}x ({:.1}%)\n\
+                     │  Window:          {} / {}\n\
+                     │  Peaks:           [{}]\n\
+                     └──\n\n",
+                    label,
+                    avg, avg * 100.0,
+                    peaks.len(), engine.average_window,
+                    peaks_str.join(", "),
+                ));
+            }
+        }
     }
 
     // ── Detailed Token Log ──

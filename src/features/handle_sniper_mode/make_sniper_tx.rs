@@ -14,7 +14,20 @@ pub async fn make_sniper_tx(trade_token_data_map: &HashMap<Pubkey, TokenDatabase
             if !*DEV_MODE || buy_tx_remaining_counter != 0 {
                 decrese_buy_tx_remain_counter();
 
-                let buy_sol = token_data.override_buy_amount_sol.unwrap_or(*BUY_AMOUNT_SOL);
+                let base_buy_sol = token_data.override_buy_amount_sol.unwrap_or(*BUY_AMOUNT_SOL);
+                let buy_sol = DYNAMIC_BUY.adjusted_buy_amount(&token_data.matched_pattern_label, base_buy_sol);
+                if (buy_sol - base_buy_sol).abs() > 1e-9 {
+                    info!(
+                        "\n💰 [DYNAMIC_BUY] Buy amount adjusted\n\
+                         │  Pattern:      {}\n\
+                         │  Mint:         {}\n\
+                         │  Base Buy:     {:.4} SOL\n\
+                         │  Adjusted Buy: {:.4} SOL  ({:.1}x)\n\
+                         └──────────────────────",
+                        token_data.matched_pattern_label, token_data.token_mint,
+                        base_buy_sol, buy_sol, buy_sol / base_buy_sol,
+                    );
+                }
                 let mut ix: Vec<Instruction> = Vec::new();
                 let create_ata_ix = token_data.pumpfun_struct.get_create_ata_idempotent_ix();
                 let buy_ix = token_data

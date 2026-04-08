@@ -52,6 +52,12 @@ pub static BNB_RPC_ENDPOINT: Lazy<String> =
 
 //Buy setting
 pub static BUY_AMOUNT_SOL: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.buy_amount_sol);
+pub static DYNAMIC_BUY_AMOUNT_MODE: Lazy<bool> = Lazy::new(|| CONFIG.buy_setting.dynamic_buy_amount_mode);
+pub static LOSS_SEQUENCE: Lazy<u32> = Lazy::new(|| CONFIG.buy_setting.loss_sequence.max(1));
+pub static PROFIT_SEQUENCE: Lazy<u32> = Lazy::new(|| CONFIG.buy_setting.profit_sequence.max(1));
+pub static LOSS_MULTIPLY: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.loss_multiply.clamp(0.01, 1.0));
+pub static PROFIT_MULTIPLY: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.profit_multiply.max(1.0));
+pub static MAX_BUY_AMOUNT_MULTIPLY: Lazy<f64> = Lazy::new(|| CONFIG.buy_setting.max_buy_amount_multiply.max(0.01));
 
 //Slippage
 pub static SLIPPAGE: Lazy<f64> =

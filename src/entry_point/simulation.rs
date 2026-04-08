@@ -23,11 +23,17 @@ async fn main() {
     let engine = SimEngine::new();
 
     info!(
-        "Config: buy_amount={} SOL | SL={:.0}% | TP_multiply={:.0}% | confirmation=150ms",
+        "Config: buy_amount={} SOL | SL={:.0}% | TP_multiply={:.0}% | confirmation=150ms | mode={}",
         engine.buy_amount_sol,
         engine.stop_loss_pct * 100.0,
         engine.real_tp_multiply * 100.0,
+        engine.simulation_mode,
     );
+    if engine.simulation_mode == "EMA" {
+        info!("EMA Alpha: {} (ATH tracked for 1h per token)", engine.ema_alpha);
+    } else if engine.simulation_mode == "AVERAGE" {
+        info!("Average Window: {} tokens (ATH tracked for 1h per token)", engine.average_window);
+    }
 
     let grpc_config = GrpcClientConfig::new(
         "simulation".to_string(),

@@ -22,12 +22,21 @@ pub struct ConnectionConfig {
 #[derive(Debug, Deserialize)]
 pub struct BuySetting {
     pub buy_amount_sol: f64,
+    pub dynamic_buy_amount_mode: bool,
+    pub loss_sequence: u32,
+    pub profit_sequence: u32,
+    pub loss_multiply: f64,
+    pub profit_multiply: f64,
+    pub max_buy_amount_multiply: f64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SellSetting {
     pub stop_loss: f64,
     pub real_tp_multiply: f64,
+    pub tp_mode: String,
+    pub ema_alpha: f64,
+    pub average_window: usize,
     pub trailing_1: f64,
     pub trailing_1_stop: f64,
     pub trailing_1_sell_percentage: f64,
@@ -68,6 +77,9 @@ pub struct FeeConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct SimulationSetting {
+    pub simulation_mode: String,
+    pub ema_alpha: f64,
+    pub average_window: usize,
     pub buy_amount_sol: f64,
     pub stop_loss: f64,
     pub real_tp_multiply: f64,
