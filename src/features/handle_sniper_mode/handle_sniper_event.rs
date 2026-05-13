@@ -73,22 +73,6 @@ pub async fn handle_trade_events(
         let initial_price = (mint_event.virtual_sol_reserves as f64 / 1e9)
             / (mint_event.virtual_token_reserves as f64 / 1e6);
 
-        // Phase 2 Monitor Mode: Run filters on ALL new mints and send to Telegram
-        // This is observation-only — it does NOT trigger buys
-        if tg_notify_enabled() {
-            let monitor_ctx = FilterContext::new(
-                mint_event.mint,
-                mint_event.creator,
-                mint_event.name.clone(),
-                mint_event.symbol.clone(),
-                mint_event.uri.clone(),
-                mint_event.token_total_supply,
-                tx_slot,
-                initial_price,
-            );
-            let _monitor_result = run_pre_buy_filters(&monitor_ctx).await;
-        }
-
         // Check server-pushed patterns (CU fingerprint match)
         let server_pattern_matched = patterns.iter().any(|p| p.mint_pattern == (unit, price));
 
