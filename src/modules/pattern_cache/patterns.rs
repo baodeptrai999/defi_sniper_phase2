@@ -62,5 +62,25 @@ use super::pattern_translator::{BuyIxRaw, ManualPatternRaw};
 /// └─────────────────────────────────────────────────────────────────────┘
 
 pub fn get_raw_manual_patterns() -> Vec<ManualPatternRaw> {
-    vec![]
+    vec![
+        // ── CATCH-ALL: Buy mọi token mới qua Anti-Rug filter ──
+        // Không đặt CU/instruction filter → khớp tất cả token
+        // Anti-Rug 5 module sẽ bảo vệ khỏi scam/rug-pull
+        ManualPatternRaw {
+            label: Some("ALL_PUMPFUN_FILTERED".to_string()),
+            dev_cu_limit: None,                    // Không lọc CU
+            dev_cu_price: None,                    // Không lọc CU
+            mint_instructions: None,               // Không lọc instruction
+            dev_buy_instruction_data: None,        // Không lọc buy data
+            bundle_buy_cu_limit: None,
+            bundle_buy_cu_price: None,
+            stop_loss: Some(50.0),                 // Cắt lỗ 50%
+            take_profit: vec![150.0, 300.0],       // Chốt lời 150% và 300%
+            sell_amounts: Some(vec![50.0, 50.0]),  // Bán 50% ở mỗi mốc
+            token_version: None,                   // Cả V1 và V2
+            alt_addresses: None,
+            mint_tx_version: None,
+            buy_amount_sol: Some(0.001),           // Mua 0.001 SOL (an toàn)
+        },
+    ]
 }
