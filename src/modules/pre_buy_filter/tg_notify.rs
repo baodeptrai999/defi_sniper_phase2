@@ -119,3 +119,34 @@ pub fn tg_send_filter_result(
             .await;
     });
 }
+
+pub fn tg_send_trade_notification(is_buy: bool, mint: &str, tx_id: &str, amount_sol: f64) {
+    if !tg_notify_enabled() {
+        return;
+    }
+
+    let mint_str = mint.to_string();
+    let tx_id_str = tx_id.to_string();
+    let token_token = TG_BOT_TOKEN.clone();
+    let chat_id = TG_CHAT_ID.clone();
+    
+    let action = if is_buy { "🟢 <b>BUY SUCCESS</b>" } else { "🔴 <b>SELL SUCCESS</b>" };
+
+    tokio::spawn(async move {
+        let msg = format!(
+            "{}\n──────────────────\n🪙 <b>Mint:</b> <code>{}</code>\n💸 <b>Amount:</b> {:.4} SOL\n🔗 <a href=\"https://solscan.io/tx/{}\">View on Solscan</a>",
+            action, mint_str, amount_sol, tx_id_str
+        );
+
+        let url = format!("https://api.telegram.org/bot{}/sendMessage", token_token);
+        let payload = serde_json::json!({
+            "chat_id": chat_id,
+            "text": msg,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": true
+        });
+
+        let client = reqwest::Client::new();
+        let _ = client.post(&url).json(&payload).send().await;
+    });
+}

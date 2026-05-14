@@ -21,6 +21,8 @@ pub fn update_status_from_pumpfun_buy_event(
             tx_id,
             buy_event.mint
         );
+        crate::modules::pre_buy_filter::tg_notify::tg_send_trade_notification(true, &buy_event.mint, &tx_id, buy_event.sol_amount);
+        
         token_data.token_is_purchased = true;
         token_data.token_balance += buy_event.token_amount;
         token_data.token_buying_point_price = updated_token_price;
@@ -62,6 +64,8 @@ pub fn update_status_from_pumpfun_sell_event(
             tx_id,
             sell_event.mint.to_string()
         );
+        crate::modules::pre_buy_filter::tg_notify::tg_send_trade_notification(false, &sell_event.mint, &tx_id, sell_event.sol_amount);
+        
         token_data.token_balance -= sell_event.token_amount;
         token_data.token_sell_status = TokenSellStatus::None;
         token_data.pending_tp_sell_index = None;
