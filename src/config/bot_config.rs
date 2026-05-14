@@ -71,7 +71,7 @@ pub static ZERO_SLOT_API_KEY: Lazy<String> = Lazy::new(|| CONFIG.landing_service
 pub static HELIUS_API_KEY: Lazy<String> = Lazy::new(|| CONFIG.landing_service_config.helius_api_key.clone());
 
 pub static ZERO_SLOT_ENDPOINT: Lazy<String> = Lazy::new(|| format!("http://de1.0slot.trade?api-key={}", *ZERO_SLOT_API_KEY));
-pub static HELIUS_ENDPOINT: Lazy<String> = Lazy::new(|| "http://fra-sender.helius-rpc.com/fast".to_string());
+pub static HELIUS_ENDPOINT: Lazy<String> = Lazy::new(|| format!("http://fra-sender.helius-rpc.com/fast?api-key={}", *HELIUS_API_KEY));
 
 //Fee
 pub static BUY_COMPUTE_UNIT_LIMIT: Lazy<u64> =
