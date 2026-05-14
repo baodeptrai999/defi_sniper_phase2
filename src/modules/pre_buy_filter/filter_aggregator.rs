@@ -59,6 +59,11 @@ pub async fn run_pre_buy_filters(ctx: &FilterContext) -> AggregatedFilterResult 
         should_buy = true;
     }
 
+    if !crate::BOT_IS_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
+        should_buy = false;
+        // Optionally add a dummy result indicating manual stop, but returning false is enough
+    }
+
     // Dynamic position sizing based on risk
     let buy_amount_multiplier = if should_buy && *ENABLE_DYNAMIC_SIZING && total_risk > 0.0 {
         let raw_multiplier = 1.0 - (total_risk / *MAX_TOTAL_RISK_SCORE);
@@ -77,8 +82,10 @@ pub async fn run_pre_buy_filters(ctx: &FilterContext) -> AggregatedFilterResult 
     };
 
     // ── Log the decision ──
+    crate::STAT_SCANNED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     if should_buy {
         if total_risk > 0.0 {
+            crate::STAT_WARNED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             info!(
                 "🟡 [FILTER_PASS_WARN] MINT: {} | creator: {} | name: '{}' | risk: {:.1} | mul: {:.2}x | {}",
                 ctx.mint,
@@ -89,12 +96,14 @@ pub async fn run_pre_buy_filters(ctx: &FilterContext) -> AggregatedFilterResult 
                 aggregated.rejection_summary(),
             );
         } else {
+            crate::STAT_PASSED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             info!(
                 "🟢 [FILTER_PASS] MINT: {} | creator: {} | name: '{}' | CLEAN",
                 ctx.mint, ctx.creator, ctx.name,
             );
         }
     } else {
+        crate::STAT_REJECTED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         info!(
             "🔴 [FILTER_REJECT] MINT: {} | creator: {} | name: '{}' | risk: {:.1} | {}",
             ctx.mint,

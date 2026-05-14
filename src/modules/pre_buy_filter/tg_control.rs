@@ -1,7 +1,7 @@
 use crate::*;
 use serde_json::{json, Value};
 use std::env;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tokio::time::{sleep, Duration};
 
 pub static WARN_ONLY_MODE: AtomicBool = AtomicBool::new(false);
@@ -10,6 +10,16 @@ pub static ENABLE_M2_PANIC: AtomicBool = AtomicBool::new(true);
 pub static ENABLE_M3_DEV: AtomicBool = AtomicBool::new(true);
 pub static ENABLE_M4_GENESIS: AtomicBool = AtomicBool::new(true);
 pub static ENABLE_M5_METADATA: AtomicBool = AtomicBool::new(true);
+
+// Global State
+pub static BOT_IS_RUNNING: AtomicBool = AtomicBool::new(false);
+
+// Global Stats (Mocked for now, wired up later)
+pub static STAT_SCANNED: AtomicU64 = AtomicU64::new(0);
+pub static STAT_PASSED: AtomicU64 = AtomicU64::new(0);
+pub static STAT_REJECTED: AtomicU64 = AtomicU64::new(0);
+pub static STAT_WARNED: AtomicU64 = AtomicU64::new(0);
+pub static STAT_SKIPPED: AtomicU64 = AtomicU64::new(0);
 
 pub async fn start_telegram_control_bot() {
     let token = match env::var("TG_BOT_TOKEN") {
@@ -41,13 +51,10 @@ pub async fn start_telegram_control_bot() {
                             let text = message["text"].as_str().unwrap_or("");
                             let sender_chat_id = message["chat"]["id"].as_i64().unwrap_or(0).to_string();
                             
-                            // Debug log to see incoming messages
                             info!("📥 [TG_CONTROL] Received msg: '{}' from chat_id: {}", text, sender_chat_id);
                             
                             if sender_chat_id == chat_id {
-                                if text.starts_with("/start") || text.starts_with("/settings") {
-                                    send_settings_menu(&client, &token, &chat_id).await;
-                                }
+                                handle_text_message(&client, &token, &chat_id, text).await;
                             } else {
                                 info!("⚠️ [TG_CONTROL] Ignored msg from unauthorized chat_id: {} (expected: {})", sender_chat_id, chat_id);
                             }
@@ -62,7 +69,6 @@ pub async fn start_telegram_control_bot() {
 
                             if sender_chat_id == chat_id {
                                 handle_callback(&client, &token, &chat_id, message_id, data).await;
-                                // Answer callback query
                                 let answer_url = format!("https://api.telegram.org/bot{}/answerCallbackQuery", token);
                                 let _ = client.post(&answer_url).json(&json!({"callback_query_id": callback_id})).send().await;
                             }
@@ -81,39 +87,180 @@ pub async fn start_telegram_control_bot() {
     }
 }
 
+async fn handle_text_message(client: &reqwest::Client, token: &str, chat_id: &str, text: &str) {
+    match text {
+        "/start" | "📊 Dashboard" => {
+            send_dashboard(client, token, chat_id, "Today").await;
+        }
+        "💰 Wallet management" => {
+            send_simple_msg(client, token, chat_id, "💰 Wallet management settings coming soon!").await;
+        }
+        "⚙️ Trading parameters" => {
+            send_simple_msg(client, token, chat_id, "⚙️ Trading parameters coming soon!").await;
+        }
+        "🛡️ Anti-Rug" => {
+            send_settings_menu(client, token, chat_id).await;
+        }
+        "▶️ Start" => {
+            BOT_IS_RUNNING.store(true, Ordering::Relaxed);
+            send_simple_msg_with_keyboard(client, token, chat_id, "✅ Bot is started").await;
+        }
+        "⏹️ Stop" => {
+            BOT_IS_RUNNING.store(false, Ordering::Relaxed);
+            send_simple_msg_with_keyboard(client, token, chat_id, "🛑 Bot is stopped").await;
+        }
+        _ => {}
+    }
+}
+
+async fn send_simple_msg(client: &reqwest::Client, token: &str, chat_id: &str, msg: &str) {
+    let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
+    let payload = json!({ "chat_id": chat_id, "text": msg });
+    let _ = client.post(&url).json(&payload).send().await;
+}
+
+async fn send_simple_msg_with_keyboard(client: &reqwest::Client, token: &str, chat_id: &str, msg: &str) {
+    let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
+    let payload = json!({
+        "chat_id": chat_id,
+        "text": msg,
+        "reply_markup": build_reply_keyboard()
+    });
+    let _ = client.post(&url).json(&payload).send().await;
+}
+
+fn build_reply_keyboard() -> Value {
+    let run_btn = if BOT_IS_RUNNING.load(Ordering::Relaxed) { "⏹️ Stop" } else { "▶️ Start" };
+    json!({
+        "keyboard": [
+            [{"text": "💰 Wallet management"}, {"text": "⚙️ Trading parameters"}],
+            [{"text": "🛡️ Anti-Rug"}, {"text": run_btn}]
+        ],
+        "resize_keyboard": true,
+        "is_persistent": true
+    })
+}
+
+fn build_dashboard_text(period: &str) -> String {
+    let scanned = STAT_SCANNED.load(Ordering::Relaxed);
+    let passed = STAT_PASSED.load(Ordering::Relaxed);
+    let rejected = STAT_REJECTED.load(Ordering::Relaxed);
+    let warned = STAT_WARNED.load(Ordering::Relaxed);
+    let skipped = STAT_SKIPPED.load(Ordering::Relaxed);
+    let pass_rate = if scanned > 0 { (passed as f64 / scanned as f64) * 100.0 } else { 0.0 };
+
+    format!("📊 {}\n\
+    ──────────────────\n\
+    💰 *PNL Summary*\n\
+    ├ Realized PNL: +0.0000 SOL\n\
+    ├ Total spent: 0.0000 SOL\n\
+    ├ Total received: 0.0000 SOL\n\
+    ├ Win rate: 0.0% (0/0)\n\
+    ├ ✅ Wins: 0\n\
+    └ ❌ Losses: 0\n\n\
+    💹 *Trade Activity*\n\
+    ├ Total buys: 0 (✅ 0 / ❌ 0)\n\
+    ├ Buy success rate: 0.0%\n\
+    └ Total sells: 0\n\n\
+    🛡️ *Anti-Rug Filter*\n\
+    ├ Scanned: {}\n\
+    ├ ✅ Passed: {}\n\
+    ├ ❌ Rejected: {}\n\
+    ├ ⚠️ Warned: {}\n\
+    ├ 🚫 Skipped: {}\n\
+    └ Pass rate: {:.1}%\n", period, scanned, passed, rejected, warned, skipped, pass_rate)
+}
+
+fn build_dashboard_inline_keyboard() -> Value {
+    json!({
+        "inline_keyboard": [
+            [{"text": "📊 Select time period for stats:", "callback_data": "ignore"}],
+            [{"text": "📅 Today", "callback_data": "time_today"}, {"text": "📈 7 Days", "callback_data": "time_7d"}],
+            [{"text": "📅 30 Days", "callback_data": "time_30d"}, {"text": "🌐 All Time", "callback_data": "time_all"}]
+        ]
+    })
+}
+
+async fn send_dashboard(client: &reqwest::Client, token: &str, chat_id: &str, period: &str) {
+    let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
+    let text = build_dashboard_text(period);
+    
+    let payload = json!({
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown",
+        "reply_markup": build_dashboard_inline_keyboard()
+    });
+    
+    // Send dashboard and simultaneously send the reply keyboard
+    let _ = client.post(&url).json(&payload).send().await;
+    
+    // Ensure reply keyboard is attached
+    let payload2 = json!({
+        "chat_id": chat_id,
+        "text": "Options loaded below 👇",
+        "reply_markup": build_reply_keyboard()
+    });
+    let _ = client.post(&url).json(&payload2).send().await;
+}
+
+async fn update_dashboard(client: &reqwest::Client, token: &str, chat_id: &str, message_id: i64, period: &str) {
+    let url = format!("https://api.telegram.org/bot{}/editMessageText", token);
+    let text = build_dashboard_text(period);
+    
+    let payload = json!({
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text,
+        "parse_mode": "Markdown",
+        "reply_markup": build_dashboard_inline_keyboard()
+    });
+    let _ = client.post(&url).json(&payload).send().await;
+}
+
+// ── Anti-Rug Settings Logic ──
+
 async fn handle_callback(client: &reqwest::Client, token: &str, chat_id: &str, message_id: i64, data: &str) {
     match data {
+        "time_today" => update_dashboard(client, token, chat_id, message_id, "Today").await,
+        "time_7d" => update_dashboard(client, token, chat_id, message_id, "7 Days").await,
+        "time_30d" => update_dashboard(client, token, chat_id, message_id, "30 Days").await,
+        "time_all" => update_dashboard(client, token, chat_id, message_id, "All Time").await,
         "toggle_warn" => {
             let current = WARN_ONLY_MODE.load(Ordering::Relaxed);
             WARN_ONLY_MODE.store(!current, Ordering::Relaxed);
+            update_settings_menu(client, token, chat_id, message_id).await;
         }
         "toggle_m1" => {
             let current = ENABLE_M1_HOLDER.load(Ordering::Relaxed);
             ENABLE_M1_HOLDER.store(!current, Ordering::Relaxed);
+            update_settings_menu(client, token, chat_id, message_id).await;
         }
         "toggle_m2" => {
             let current = ENABLE_M2_PANIC.load(Ordering::Relaxed);
             ENABLE_M2_PANIC.store(!current, Ordering::Relaxed);
+            update_settings_menu(client, token, chat_id, message_id).await;
         }
         "toggle_m3" => {
             let current = ENABLE_M3_DEV.load(Ordering::Relaxed);
             ENABLE_M3_DEV.store(!current, Ordering::Relaxed);
+            update_settings_menu(client, token, chat_id, message_id).await;
         }
         "toggle_m4" => {
             let current = ENABLE_M4_GENESIS.load(Ordering::Relaxed);
             ENABLE_M4_GENESIS.store(!current, Ordering::Relaxed);
+            update_settings_menu(client, token, chat_id, message_id).await;
         }
         "toggle_m5" => {
             let current = ENABLE_M5_METADATA.load(Ordering::Relaxed);
             ENABLE_M5_METADATA.store(!current, Ordering::Relaxed);
+            update_settings_menu(client, token, chat_id, message_id).await;
         }
         _ => {}
     }
-
-    update_settings_menu(client, token, chat_id, message_id).await;
 }
 
-fn build_keyboard() -> Value {
+fn build_settings_keyboard() -> Value {
     let w = if WARN_ONLY_MODE.load(Ordering::Relaxed) { "⚠️ Warn-Only Mode (no block)" } else { "❌ Warn-Only Mode (no block)" };
     let m1 = if ENABLE_M1_HOLDER.load(Ordering::Relaxed) { "✅ M1: Holder Analyzer" } else { "❌ M1: Holder Analyzer" };
     let m2 = if ENABLE_M2_PANIC.load(Ordering::Relaxed) { "✅ M2: Panic-Sell Monitor" } else { "❌ M2: Panic-Sell Monitor" };
@@ -132,7 +279,7 @@ fn build_keyboard() -> Value {
             [{"text": m3, "callback_data": "toggle_m3"}],
             [{"text": m4, "callback_data": "toggle_m4"}],
             [{"text": m5, "callback_data": "toggle_m5"}],
-            [{"text": "🔙 Back to Trading", "callback_data": "ignore"}]
+            [{"text": "🔙 Close", "callback_data": "ignore"}]
         ]
     })
 }
@@ -143,7 +290,7 @@ async fn send_settings_menu(client: &reqwest::Client, token: &str, chat_id: &str
         "chat_id": chat_id,
         "text": "⚙️ **Anti-Rug Intelligence Settings**",
         "parse_mode": "Markdown",
-        "reply_markup": build_keyboard()
+        "reply_markup": build_settings_keyboard()
     });
     let _ = client.post(&url).json(&payload).send().await;
 }
@@ -153,7 +300,7 @@ async fn update_settings_menu(client: &reqwest::Client, token: &str, chat_id: &s
     let payload = json!({
         "chat_id": chat_id,
         "message_id": message_id,
-        "reply_markup": build_keyboard()
+        "reply_markup": build_settings_keyboard()
     });
     let _ = client.post(&url).json(&payload).send().await;
 }
