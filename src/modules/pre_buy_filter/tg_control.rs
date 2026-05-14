@@ -93,7 +93,7 @@ async fn handle_text_message(client: &reqwest::Client, token: &str, chat_id: &st
     } else if text.contains("Wallet management") {
         let balance = crate::RPC_CLIENT.get_balance(&*crate::SIGNER_PUBKEY).await.unwrap_or(0);
         let sol_balance = balance as f64 / 1_000_000_000.0;
-        let msg = format!("💰 **Wallet Management**\n──────────────────\n🔑 **Address:** `{}`\n💵 **Balance:** {:.4} SOL\n\n_Note: To change wallets, update the private_key in your .env file and restart the bot._", *crate::SIGNER_PUBKEY, sol_balance);
+        let msg = format!("💰 **Wallet Management**\n──────────────────\n🔑 **Address:** `{}`\n💵 **Balance:** {:.4} SOL\n\n_Note: To change wallets, update the `private_key` in your .env file and restart the bot._", *crate::SIGNER_PUBKEY, sol_balance);
         send_simple_msg_with_parse_mode(client, token, chat_id, &msg, "Markdown").await;
     } else if text.contains("Trading parameters") {
         let msg = format!("⚙️ **Trading Parameters**\n──────────────────\n💸 **Base Buy Amount:** {} SOL\n🛑 **Stop Loss:** {:.0}%\n📈 **Dynamic Sizing:** {}\n🛡️ **Max Risk Allowed:** {}\n\n_Note: To modify parameters, please edit `Config.toml`._",
