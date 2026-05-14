@@ -93,16 +93,16 @@ async fn handle_text_message(client: &reqwest::Client, token: &str, chat_id: &st
     } else if text.contains("Wallet management") {
         let balance = crate::RPC_CLIENT.get_balance(&*crate::SIGNER_PUBKEY).await.unwrap_or(0);
         let sol_balance = balance as f64 / 1_000_000_000.0;
-        let msg = format!("💰 **Wallet Management**\n──────────────────\n🔑 **Address:** `{}`\n💵 **Balance:** {:.4} SOL\n\n_Note: To change wallets, update the `private_key` in your .env file and restart the bot._", *crate::SIGNER_PUBKEY, sol_balance);
-        send_simple_msg_with_parse_mode(client, token, chat_id, &msg, "Markdown").await;
+        let msg = format!("💰 <b>Wallet Management</b>\n──────────────────\n🔑 <b>Address:</b> <code>{}</code>\n💵 <b>Balance:</b> {:.4} SOL\n\n<i>Note: To change wallets, update the private_key in your .env file and restart the bot.</i>", *crate::SIGNER_PUBKEY, sol_balance);
+        send_simple_msg_with_parse_mode(client, token, chat_id, &msg, "HTML").await;
     } else if text.contains("Trading parameters") {
-        let msg = format!("⚙️ **Trading Parameters**\n──────────────────\n💸 **Base Buy Amount:** {} SOL\n🛑 **Stop Loss:** {:.0}%\n📈 **Dynamic Sizing:** {}\n🛡️ **Max Risk Allowed:** {}\n\n_Note: To modify parameters, please edit `Config.toml`._",
+        let msg = format!("⚙️ <b>Trading Parameters</b>\n──────────────────\n💸 <b>Base Buy Amount:</b> {} SOL\n🛑 <b>Stop Loss:</b> {:.0}%\n📈 <b>Dynamic Sizing:</b> {}\n🛡️ <b>Max Risk Allowed:</b> {}\n\n<i>Note: To modify parameters, please edit Config.toml.</i>",
             *crate::BUY_AMOUNT_SOL,
             *crate::STOP_LOSS * 100.0,
             if *crate::ENABLE_DYNAMIC_SIZING { "✅ ON" } else { "❌ OFF" },
             *crate::MAX_TOTAL_RISK_SCORE
         );
-        send_simple_msg_with_parse_mode(client, token, chat_id, &msg, "Markdown").await;
+        send_simple_msg_with_parse_mode(client, token, chat_id, &msg, "HTML").await;
     } else if text.contains("Anti-Rug") {
         send_settings_menu(client, token, chat_id).await;
     } else if text.contains("Start") {
