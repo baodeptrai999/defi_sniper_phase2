@@ -91,9 +91,18 @@ async fn handle_text_message(client: &reqwest::Client, token: &str, chat_id: &st
     if text.starts_with("/start") || text.contains("Dashboard") {
         send_dashboard(client, token, chat_id, "Today").await;
     } else if text.contains("Wallet management") {
-        send_simple_msg(client, token, chat_id, "💰 Wallet management settings coming soon!").await;
+        let balance = crate::RPC_CLIENT.get_balance(&*crate::SIGNER_PUBKEY).await.unwrap_or(0);
+        let sol_balance = balance as f64 / 1_000_000_000.0;
+        let msg = format!("💰 **Wallet Management**\n──────────────────\n🔑 **Address:** `{}`\n💵 **Balance:** {:.4} SOL\n\n_Note: To change wallets, update the private_key in your .env file and restart the bot._", *crate::SIGNER_PUBKEY, sol_balance);
+        send_simple_msg_with_parse_mode(client, token, chat_id, &msg, "Markdown").await;
     } else if text.contains("Trading parameters") {
-        send_simple_msg(client, token, chat_id, "⚙️ Trading parameters coming soon!").await;
+        let msg = format!("⚙️ **Trading Parameters**\n──────────────────\n💸 **Base Buy Amount:** {} SOL\n🛑 **Stop Loss:** {:.0}%\n📈 **Dynamic Sizing:** {}\n🛡️ **Max Risk Allowed:** {}\n\n_Note: To modify parameters, please edit `Config.toml`._",
+            *crate::BUY_AMOUNT_SOL,
+            *crate::STOP_LOSS * 100.0,
+            if *crate::ENABLE_DYNAMIC_SIZING { "✅ ON" } else { "❌ OFF" },
+            *crate::MAX_TOTAL_RISK_SCORE
+        );
+        send_simple_msg_with_parse_mode(client, token, chat_id, &msg, "Markdown").await;
     } else if text.contains("Anti-Rug") {
         send_settings_menu(client, token, chat_id).await;
     } else if text.contains("Start") {
@@ -108,6 +117,12 @@ async fn handle_text_message(client: &reqwest::Client, token: &str, chat_id: &st
 async fn send_simple_msg(client: &reqwest::Client, token: &str, chat_id: &str, msg: &str) {
     let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
     let payload = json!({ "chat_id": chat_id, "text": msg });
+    let _ = client.post(&url).json(&payload).send().await;
+}
+
+async fn send_simple_msg_with_parse_mode(client: &reqwest::Client, token: &str, chat_id: &str, msg: &str, parse_mode: &str) {
+    let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
+    let payload = json!({ "chat_id": chat_id, "text": msg, "parse_mode": parse_mode });
     let _ = client.post(&url).json(&payload).send().await;
 }
 
